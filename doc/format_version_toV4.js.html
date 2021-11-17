@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: format/version/toV4.js</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: format/version/toV4.js</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>/** @module version/toV4
+ * @description Convert to V4 format
+ */
+import { layout } from "../../layout/layout";
+import {asArray as ol_color_asArray} from 'ol/color'
+import Geoportail from "../../layer/Geoportail";
+
+/* Convert dummy value to bool */
+function toBool(t) {
+  return !!(typeof(t) === 'string' ? parseInt(t) : t);
+}
+
+/** Convert Carte options to V4 format
+ * @param {} options
+ */
+function carteV4(options) {
+  console.log(JSON.parse(JSON.stringify(options)));
+
+  // Check version
+  if (options.version > 4) return;
+  // Convert
+  options.version = 4.01;
+  options.param.title = options.param.titre;
+  // Controls
+  const ctrl = options.param.controlParams
+  options.controls = {
+    zoom: toBool(ctrl.zoomBtn),
+    scaleLine: toBool(ctrl.scaleLine),
+    searchBar: toBool(ctrl.pSearchBar),
+    layerSwitcher: toBool(ctrl.selectLayer),
+    locate: toBool(ctrl.geoloc),
+    printDlg: toBool(ctrl.printDlg)
+  }
+  if (toBool(ctrl.coords)) {
+    options.controls.mousePosition = {
+      proj: options.param.proj.valeur,
+      unit: options.param.proj.unite === 'ds' ? 'dms' : 'dec'
+    }
+  } else {
+    options.controls.mousePosition = false;
+  }
+  // Legend
+  if (ctrl.legend === '1' || ctrl.legend === true) {
+    options.controls.legend = {
+      title: options.legende.legendtitle,
+      visible: options.legende.legendVisible,
+      width: options.legende.legendWidth,
+      lineHeight: options.legende.lineHeight,
+      items: options.legende.legend
+    }
+  } else {
+    options.controls.legend = false;
+  }
+  ['titre', 'status', 'controlParams', 'proj'].forEach( o => delete options.param[o] );
+  delete options.legende;
+
+  // Layers
+  options.layers.forEach((l, i) => {
+    // !? BUG Rodolphe ?!
+    if (l.wms &amp;&amp; l.name==='Plan IGN niveaux de gris') {
+      options.layers[i] = {
+        description: Geoportail.capabilities['GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2'].desc,
+        layer: 'GEOGRAPHICALGRIDSYSTEMS.MAPS.SCAN-EXPRESS.NIVEAUXGRIS',
+        name: l.name,
+        opacity: l.opacity,
+        titre: l.titre,
+        type: 'Geoportail',
+        visibility: l.visibility
+      }
+    }
+  });
+
+  console.log('CARTE:', options)
+}
+
+export { carteV4 }
+
+/* Convert theme names
+ */
+function getTheme(name) {
+  if (layout[name]) return name;
+  else {
+    const oldTheme = {
+      custom: 'custom',
+      gris: 'gray',
+      vert: 'green',
+      brun: 'braun',
+      bleu: 'blue',
+      violet: 'purple'
+    }
+    return oldTheme[name] || 'blue'
+  }
+}
+
+/** Convert Carte options to V4 format
+ * @param {} options
+ */
+function storyV4(options) {
+  // Check version
+  if (options.version > 4) return;
+  console.log(JSON.parse(JSON.stringify(options)));
+
+  // Convert
+  options.version = 4.01;
+  options.type = options.modele.type;
+
+  options.param = {
+    title: options.infos.title,
+    subTitle: options.infos.subTitle,
+    logo: options.infos.logo,
+    showTitle: options.infos.visibility,
+    description: options.infos.description,
+    lon: options.cartes.lon,
+    lat: options.cartes.lat,
+    rot: options.cartes.rot,
+    zoom: options.cartes.zoom
+  }
+  options.layout = {
+    theme: getTheme(options.modele.theme),
+    photo: options.photo,
+    colors: [],
+    voletPosition: options.volet ? options.volet.position.replace('gauche', 'left').replace('droite', 'right') : 'right',
+    voletWidth: parseInt(options.volet ? options.volet.width : 0) || 250,
+    compare: options.compare ? options.compare.pos : ''
+  }
+  if (options.modele.bColor) options.layout.colors.push(ol_color_asArray(options.modele.bColor));
+  if (options.modele.fColor) options.layout.colors.push(ol_color_asArray(options.modele.fColor));
+  if (options.compare) {
+    options.cartes = [{
+      title: options.compare.map1_titre,
+      id: options.compare.map1
+    }, {
+      title: options.compare.map2_titre,
+      id: options.compare.map2
+    }];
+    options.param.lon = options.compare.lon;
+    options.param.lat = options.compare.lat;
+    options.param.zoom = options.compare.zoom;
+  } else {
+    options.cartes = [{
+      title: options.cartes.name,
+      id: options.cartes.idUniqueIFrame
+    }];
+  }
+  if (options.etapes) {
+    options.steps = [];
+    options.etapes.sort.forEach(s => {
+      options.steps.push(options.etapes[s]);
+    });
+  }
+  options.tools = options.ifrTools;
+  options.controls = {
+    zoom: toBool(options.controls.zoom),
+    scaleLine: toBool(options.controls.scale),
+    rotation: toBool(options.controls.rotation),
+    searchBar: toBool(options.controls.search),
+    layerSwitcher: toBool(options.controls.lswitcher), 
+    locate: toBool(options.controls.locate),
+    printDlg: toBool(options.ifrTools.print),
+    mousePosition: toBool(options.controls.position), 
+    legend: toBool(options.controls.legend)
+  };
+  if (options.bulle) options.bulle.type = (options.bulle.type || 'default').replace('mainPopup', '').trim();
+  options.popup = {
+    popup: options.bulle || { type: 'default' },
+    tips: options.tooltips
+  };
+
+  if (options.type === 'onglet') {
+    options.cartes = [];
+    const onglets = options.onglets;
+    options.tabs = [];
+    onglets.sort.forEach(o => {
+      options.tabs.push({
+        id: onglets[o].map,
+        title: onglets[o].title,
+        showTitle: onglets[o].showTitle,
+        description: onglets[o].content
+      });
+    })
+  }
+
+  ['modele', 'infos', 'volet', 'etapes', 'ifrTools', 'photo', 'bulle', 'tooltips', 'onglets'].forEach((i) => {
+    delete options[i]
+  });
+
+  console.log('StoryMap:', options)
+}
+
+export { storyV4 }
+</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="module-dialog_url.html">dialog/url</a></li><li><a href="module-font_loadFonts.html">font/loadFonts</a></li><li><a href="module-layout.html">layout</a></li><li><a href="module-layout_JCSSRule.html">layout/JCSSRule</a></li><li><a href="module-md_md2html.html">md/md2html</a></li><li><a href="module-style_ignStyleFn.html">style/ignStyleFn</a></li><li><a href="module-version_toV4.html">version/toV4</a></li></ul><h3>Namespaces</h3><ul><li><a href="JSONFile.html">JSONFile</a></li><li><a href="JSONOptions.html">JSONOptions</a></li></ul><h3>Classes</h3><ul><li><a href="BaseFormat.html">BaseFormat</a></li><li><a href="Carte.html">Carte</a></li><li><a href="CarteFormat.html">CarteFormat</a></li><li><a href="CGU.html">CGU</a></li><li><a href="cloneFeature.html">cloneFeature</a></li><li><a href="GeoImage.html">GeoImage</a></li><li><a href="GeoportailFormat.html">GeoportailFormat</a></li><li><a href="I18N.html">I18N</a></li><li><a href="LayerFormat.html">LayerFormat</a></li><li><a href="Legend.html">Legend</a></li><li><a href="MousePosition.html">MousePosition</a></li><li><a href="Statistic.html">Statistic</a></li><li><a href="StoryMap.html">StoryMap</a></li><li><a href="StoryMapFormat.html">StoryMapFormat</a></li><li><a href="VectorStyle.html">VectorStyle</a></li><li><a href="VectorStyleFormat.html">VectorStyleFormat</a></li><li><a href="WMS.html">WMS</a></li></ul><h3>Events</h3><ul><li><a href="global.html#event:read">read</a></li></ul><h3>Global</h3><ul><li><a href="global.html#_T">_T</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 3.6.7</a> on Tue Oct 26 2021 17:05:45 GMT+0200 (heure d’été d’Europe centrale)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>

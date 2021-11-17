@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: format/layer/Layer.js</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: format/layer/Layer.js</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>import BaseFormat from '../Base'
+
+/**
+ * @classdesc
+ * Abstract base class; normally only used for creating subclasses and not instantiated in apps.
+ * Generic format for reading/writing layer.
+ * @api
+ */
+ class LayerFormat extends BaseFormat {
+  /** Constructor 
+   */
+  constructor() {
+    super();
+  }
+}
+
+/** Abstract class for reading layer
+ * @param {Object} options JSON object
+ * @return {Layer|boolean}
+ * @api
+ */
+LayerFormat.prototype.read = function(/* options */) {
+  return false;
+};
+
+/** Abstract class for reading layer
+ * @return {Layer|boolean}
+ */
+LayerFormat.prototype.write = function(/* layer, options */) {
+  return false;
+};
+
+/** Set the layers options (visibility, opacity, etc.)
+ * @param {ol.layer} layer ol layer
+ * @param {Object} options
+ * 	@param {String} options.name name of the layer
+ * 	@param {String} options.title title of the layer
+ * 	@param {bool} options.opacity opacity of the layer, default 1
+ * 	@param {bool} options.visibility visibility of the layer
+ * 	@param {String} options.copyright layer copyright
+ * 	@param {String} options.description layer description
+ * 	@param {boolean} options.cluster 
+ * 	@param {number} options.maxZoomCluster 
+ * 	@param {vboolean} options.popupHoverSelect 
+ * @api
+ */
+LayerFormat.prototype.readOptions = function(layer, options) {
+  options = options || {};
+  if (options.id) layer.set('id', options.id);
+  if (options.name) layer.set('name', options.name);
+  if (options.name || options.title) layer.set('title', options.title || options.name);
+  if (options.opacity !== undefined) layer.setOpacity(options.opacity);
+  if (options.visibility !== undefined) layer.setVisible(options.visibility);
+  if (options.description) layer.set('description', options.description);
+  if (options.copyright) {
+    layer.getSource().setAttributions(options.copyright);
+    layer.set('copyright', options.copyright);
+  }
+  // VectorLayer
+  if (options.cluster) layer.set('cluster', options.cluster);
+  if (options.maxZoomCluster) layer.set('maxZoomCluster', options.maxZoomCluster || 20);
+  if (options.popupHoverSelect) layer.set('popupHoverSelect', options.popupHoverSelect);
+  if (options.popupContent) layer.set('popupContent', options.popupContent);
+};
+
+/** Get the layers options (visibility, opacity, etc.)
+ * @param {ol.layer} layer ol layer
+ * @param {Object} options a list of options to extend. The list is extended in place.
+ * @return {Object} the options
+ * @api
+ */
+LayerFormat.prototype.writeOptions = function(layer, options) {
+  options = options || {};
+  options.name = layer.get("name")||"sans-titre";
+  options.title = layer.get("title")||"sans-titre";
+  options.visibility = layer.getVisible();
+  options.opacity = layer.getOpacity();
+  options.copyright = layer.get('copyright');
+  options.description = layer.get('description');
+  return options;
+};
+
+export default LayerFormat
+</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="module-dialog_url.html">dialog/url</a></li><li><a href="module-font_loadFonts.html">font/loadFonts</a></li><li><a href="module-layout.html">layout</a></li><li><a href="module-layout_JCSSRule.html">layout/JCSSRule</a></li><li><a href="module-md_md2html.html">md/md2html</a></li><li><a href="module-style_ignStyleFn.html">style/ignStyleFn</a></li><li><a href="module-version_toV4.html">version/toV4</a></li></ul><h3>Namespaces</h3><ul><li><a href="JSONFile.html">JSONFile</a></li><li><a href="JSONOptions.html">JSONOptions</a></li></ul><h3>Classes</h3><ul><li><a href="BaseFormat.html">BaseFormat</a></li><li><a href="Carte.html">Carte</a></li><li><a href="CarteFormat.html">CarteFormat</a></li><li><a href="CGU.html">CGU</a></li><li><a href="cloneFeature.html">cloneFeature</a></li><li><a href="GeoImage.html">GeoImage</a></li><li><a href="GeoportailFormat.html">GeoportailFormat</a></li><li><a href="I18N.html">I18N</a></li><li><a href="LayerFormat.html">LayerFormat</a></li><li><a href="Legend.html">Legend</a></li><li><a href="MousePosition.html">MousePosition</a></li><li><a href="Statistic.html">Statistic</a></li><li><a href="StoryMap.html">StoryMap</a></li><li><a href="StoryMapFormat.html">StoryMapFormat</a></li><li><a href="VectorStyle.html">VectorStyle</a></li><li><a href="VectorStyleFormat.html">VectorStyleFormat</a></li><li><a href="WMS.html">WMS</a></li></ul><h3>Events</h3><ul><li><a href="global.html#event:read">read</a></li></ul><h3>Global</h3><ul><li><a href="global.html#_T">_T</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 3.6.7</a> on Tue Oct 26 2021 17:05:45 GMT+0200 (heure d’été d’Europe centrale)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>

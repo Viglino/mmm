@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: format/layer/Statistic.js</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: format/layer/Statistic.js</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>﻿/**	@copy (c) IGN - 2017
+  @author Jean-Marc VIGLINO jean-marc.viglino@ign.fr
+*/
+import LayerFormat from './Layer';
+import VectorSource from 'ol/source/vector';
+import Feature from 'ol/Feature';
+import StatisticLayer from '../../layer/Statistic'
+
+import { ol_geom_createFromType } from 'ol-ext/geom/GeomUtils'
+
+/** Layer statistic format reader/writer.
+ * @param {} options Options.
+ */
+class Statistic extends LayerFormat {
+  // Constructor 
+  constructor() {
+    super();
+  }
+}
+
+/** Lecture
+ *	@param {} opions
+ *	@return {StatisticLayer}
+ */
+Statistic.prototype.read = function (options) {
+  if (options.type !== 'Statistique') return;
+  // Read features
+  const features = [];
+  options.features.forEach((f) => {
+    const feature = new Feature(ol_geom_createFromType(f.type, f.coords));
+    feature.setProperties(f.attributes);
+    features.push(feature);
+  });
+  // Create
+  const source = new VectorSource();
+  source.addFeatures(features);
+  const layer = new StatisticLayer({
+    source: source
+  });
+  this.readOptions(layer, options);
+  // En mode custom on connait le nombre de classe
+  if (options.stat.mode==='c') options.stat.classe = true;
+  layer.setStatistic(options.stat);
+  // Popup content
+  if (options.popupContent) {
+    layer.setPopupContent(options.popupContent);
+  }
+  if (options.stat.compose) {
+    layer.setComposite(true);
+  }
+
+//DEBUG
+window.stat = layer
+
+  // The layer
+  return layer;
+};
+
+/** Ecriture
+ *	@param {StatisticLayer} layer
+ *	@return {object} options
+ */
+Statistic.prototype.write = function (layer) {
+  if (!(layer instanceof StatisticLayer)) return false;
+  var s = this.writeOptions(layer, { type: 'Statistique' });
+
+  var stat = layer.getStatistic();
+  // Sauvegarde de tous les autres champs
+  s.stat = {
+    "typeMap": 1, "cols": 1, "mode": 1, "nbClass": 1,
+    "symbol": 1, "rmin": 1, "rmax": 1, "stroke": 1,
+    "alpha": 1, "compose": 1, "chartType": 1, "colors": 1,
+    "hradius": 1, "hblur": 1
+  };
+
+  for (var u in s.stat) s.stat[u] = stat[u];
+
+  if (stat.mode==='c') {
+    s.stat.limits = stat.limits;
+  }
+
+  if (stat.brewer) {
+    // Enregistrement dans Ma carte statistique
+    s.stat.brewerColors = stat.brewer.getColors();
+  } else {
+    // Enregistrement dans Ma carte 
+    s.stat.brewerColors = stat.brewerColors;
+  }
+  //Enregistrement de la Popup
+   if (layer.onsave) {
+     var popup =  layer.onsave();
+     layer.setPopupContent(popup);
+   }         
+  s.popupContent = layer.getPopupContent();
+
+  console.error('[TODO] write function not implemented')
+  /*
+  s.stat.compose = (layer.filter.get('operation')=='multiply');
+  s.features = (new ol_format_source_Vector()).write(layer.getSource());
+  */
+  return s;
+};
+
+export default Statistic
+</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="module-dialog_url.html">dialog/url</a></li><li><a href="module-font_loadFonts.html">font/loadFonts</a></li><li><a href="module-layout.html">layout</a></li><li><a href="module-layout_JCSSRule.html">layout/JCSSRule</a></li><li><a href="module-md_md2html.html">md/md2html</a></li><li><a href="module-style_ignStyleFn.html">style/ignStyleFn</a></li><li><a href="module-version_toV4.html">version/toV4</a></li></ul><h3>Namespaces</h3><ul><li><a href="JSONFile.html">JSONFile</a></li><li><a href="JSONOptions.html">JSONOptions</a></li></ul><h3>Classes</h3><ul><li><a href="BaseFormat.html">BaseFormat</a></li><li><a href="Carte.html">Carte</a></li><li><a href="CarteFormat.html">CarteFormat</a></li><li><a href="CGU.html">CGU</a></li><li><a href="cloneFeature.html">cloneFeature</a></li><li><a href="GeoImage.html">GeoImage</a></li><li><a href="GeoportailFormat.html">GeoportailFormat</a></li><li><a href="I18N.html">I18N</a></li><li><a href="LayerFormat.html">LayerFormat</a></li><li><a href="Legend.html">Legend</a></li><li><a href="MousePosition.html">MousePosition</a></li><li><a href="Statistic.html">Statistic</a></li><li><a href="StoryMap.html">StoryMap</a></li><li><a href="StoryMapFormat.html">StoryMapFormat</a></li><li><a href="VectorStyle.html">VectorStyle</a></li><li><a href="VectorStyleFormat.html">VectorStyleFormat</a></li><li><a href="WMS.html">WMS</a></li></ul><h3>Events</h3><ul><li><a href="global.html#event:read">read</a></li></ul><h3>Global</h3><ul><li><a href="global.html#_T">_T</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 3.6.7</a> on Tue Oct 26 2021 17:05:45 GMT+0200 (heure d’été d’Europe centrale)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>

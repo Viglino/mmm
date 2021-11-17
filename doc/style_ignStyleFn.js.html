@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: style/ignStyleFn.js</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: style/ignStyleFn.js</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>import mcOptions from '../config/config'
+
+import ol_style_Style from 'ol/style/Style'
+import ol_style_Text from 'ol/style/Text'
+import ol_style_Icon from 'ol/style/Icon'
+import ol_style_Image from 'ol/style/Image'
+import ol_style_Circle from 'ol/style/Circle'
+import ol_style_Stroke from 'ol/style/Stroke'
+import ol_style_Fill from 'ol/style/Fill'
+
+import {asArray as ol_color_asArray} from 'ol/color'
+import {DEVICE_PIXEL_RATIO as ol_has_DEVICE_PIXEL_RATIO} from 'ol/has'
+import ol_geom_Point from 'ol/geom/Point'
+import { fromExtent } from 'ol/geom/Polygon'
+import ol_geom_MultiPoint from 'ol/geom/MultiPoint'
+
+import ol_style_Photo from 'ol-ext/style/Photo'
+import ol_style_FontSymbol from 'ol-ext/style/FontSymbol'
+import ol_style_FillPattern from 'ol-ext/style/FillPattern'
+import ol_style_Shadow from 'ol-ext/style/Shadow'
+
+/** @module style/ignStyleFn
+ * @description Style function using ign styles
+ */
+
+/* ??? */
+const PATH_MACARTE = 'tobedefined/'
+/* Path to images */
+const IMAGE_SERVER = mcOptions.server;
+
+/** default ignStyle */
+const defaultIgnStyle = {
+  pointRadius: 15,
+  pointIcon: '',
+  pointGlyph: 'ign-form-poi',
+  pointForm: 'none',
+  pointOffsetY: 0,
+  pointShadow: false,
+  symbolColor: '#0000FF',
+  pointColor: '#FFFFFF',
+  pointStrokeColor: '#FFFFFF',
+  pointStrokeWidth: 2,
+  pointRotation: 0,
+  pointGradient: 0,
+
+  strokeWidth: 2,
+  strokeDash: '',
+  strokeArrow: '',
+  strokeColor: '#f80',
+
+  fillColor: 'rgba(255,136,0,0.6)',
+
+  // Motif
+  fillPattern: '',
+  sizePattern: 5,
+  spacingPattern: 10,
+  anglePattern: 0,
+  offsetPattern: 0,
+  scalePattern: 1,
+  fillColorPattern: 'rgba(0,0,0,0)',
+
+  zIndex: 0,
+
+  // Text
+  labelAttribute: '',
+  textColor: '#000',
+  textStyle: 'normal',
+  textSize: 12,
+  textFont: 'Arial, Helvetica, sans-serif',
+  textOutlineColor: '',
+  textOutlineWidth: 3,
+  textAlign: 'left',
+  textBaseline: 'alphabetic',
+};
+
+// Cache for style common to all layers, override if you want to
+let _cacheStyle = {};
+// Reset cache on PixelRatio change
+let _cachePixelRatio = window.devicePixelRatio;
+
+/** Clear style cache
+ */
+function clearCache() {
+  _cacheStyle = {};
+  _cachePixelRatio = window.devicePixelRatio;
+};
+
+/** Get all points in coordinates
+ * @param {Array&lt;ol_coordinate>} coords
+ * @returns {Array&lt;ol_coordinate>}
+ */
+function getFlatCoordinates(coords) {
+  if (coords &amp;&amp; coords[0].length &amp;&amp; coords[0][0].length) {
+    var c = [];
+    for (var i=0; i&lt;coords.length; i++) {
+      c = c.concat(getFlatCoordinates(coords[i]));
+    }
+    return c;
+  } else return coords;
+}
+
+/** Get all points in coordinates
+ * @param {ol_Feature} f
+ * @returns {ol_geom_MultiPoint}
+ */
+function getGeomPoints(f) {
+  return new ol_geom_MultiPoint( getFlatCoordinates(f.getGeometry().getCoordinates()) );
+}
+
+/* Luminance cache */
+const luminanceCache = {};
+const luminanceMax = 0.3; // Math.sqrt(1.05 * 0.05) - 0.05;
+
+/** Check color luminence / returns true if dark color
+ * @param {Array&lt;Number>} color [r,g,b]
+ * @param {Number|undefined} max, default 0.3
+ * @return {boolean}
+ * @private
+ */
+function isDarkColor(color, max) {
+  var id = color.join(',');
+  if (!Object.prototype.hasOwnProperty.call(luminanceCache, id)) {
+    try {
+      var col=[];
+      for (var i=0; i&lt;3; i++) {
+        var c = color[i] / 255.0;
+        if (c &lt;= 0.03928) col[i] = c / 12.92;
+        else col[i] = Math.pow((c + 0.055) / 1.055, 2.4);
+      }
+      luminanceCache[id] = 0.2126 * col[0] + 0.7152 * col[1] + 0.0722 * col[2];
+    } catch (e) {
+      luminanceCache[id] = 1;
+    }
+  }
+  return (luminanceCache[id] &lt; (max || luminanceMax));
+}
+
+/** Style ID used for cache key
+* @param {*} s ignStyle
+* @param {bool} clustered
+* @return {string}
+*/
+function getStyleId(s, clustered) {
+  return {
+    main: (clustered?'mainc':'main:')+s.pointRadius+'-'+s.pointIcon+'-'+s.pointGlyph+'-'+s.pointForm+'-'+s.symbolColor+'-'+s.pointColor+'-'+s.pointStrokeColor+'-'
+			+s.pointStrokeWidth+'-'+s.pointRotation+'-'+s.pointGradient+'-'+s.strokeWidth+'-'+s.strokeDash+'-'+s.strokeColor+'-'
+			+s.fillColor+'-'+s.fillPattern+'-'+s.sizePattern+'-'+s.spacingPattern+'-'+s.anglePattern+'-'+s.offsetPattern+'-'+s.scalePattern+'-'+s.fillColorPattern+'-',
+    shadow: 'shad:'+s.poointRadius,
+    arrow: 'arrow:'+s.strokeWidth+'-'+s.strokeArrow+'-'+s.strokeColor+'-',
+    text: 'text:'+s.pointRadius+'-'+s.textColor+'-'+s.textStyle+'-'+s.textSize+'-'+s.textFont
+			+'-'+s.textOutlineColor+'-'+s.textOutlineWidth+'-'
+			+'-'+s.textAlign+'-'+s.textBaseline+'-',
+   };
+}
+
+/** Get ignStyle for a feature 
+ * @param {ol_Feature}
+ */
+function getIgnStyle(f) {
+  var icon = f.getIgnStyle('pointIcon');
+  var isoffset = !icon &amp;&amp; /poi|bubble|marker|coma|shield|triangle|blazon/.test(f.getIgnStyle('pointForm'));
+  var result = {};
+  for (var i in defaultIgnStyle) {
+    result[i] = f.getIgnStyle(i);
+  }
+  result.pointShadow = isoffset;
+  result.pointOffsetY = (isoffset ? 1:0);
+  // old versions
+  switch (result.strokeDash) {
+    case 'flecheRond': {
+      result.strokeDash = '';
+      result.strokeArrow = 'circle';
+      break;
+    }
+    case 'flecheCarre': {
+      result.strokeDash = '';
+      result.strokeArrow = 'square';
+      break;
+    }
+    case 'flecheTriangle': {
+      result.strokeDash = '';
+      result.strokeArrow = 'triangle';
+      break;
+    }
+    default: break;
+  }
+  return result;
+}
+
+/** Ordering function that use the ignStyle zindex
+ */
+function ordering(f1, f2) {
+  const z1 = Number((f1.getIgnStyle()||{}).zIndex||0)
+  const z2 = Number((f2.getIgnStyle()||{}).zIndex||0);
+  if (z1===z2) {
+    return f2.getGeometry().getFirstCoordinate()[1] - f1.getGeometry().getFirstCoordinate()[1];
+  } else {
+    return z2-z1;
+  }
+}
+
+/**
+ * Create a ol.style.Image for a cluster
+ * @param {number} options.size the cluster size
+ * @param {Array&lt;number>} options.color the cluster color as [r,v,b]
+ * @param {boolean} options.dash default true
+ * @return {ol.style.Image} the cluster image
+ */
+function clusterImage(options) {
+  options = options || {};
+  var color = options.color || (options.size>25 ? [192, 0, 0] : options.size>8 ? [255, 128, 0] : [0, 128, 0]);
+  var radius = Math.max(8, Math.min(options.size*0.75, 20));
+  var dash;
+  if (options.dash!==false) {
+    dash = 2*Math.PI*radius/6;
+    dash = [0, dash, dash, dash, dash, dash, dash];
+  }
+  return new ol_style_Circle({
+    radius: radius,
+    stroke: new ol_style_Stroke({
+      color: 'rgba('+color.join(',')+',0.5)',
+      width: 15,
+      lineDash: dash,
+      lineCap: 'butt',
+    }),
+    fill: new ol_style_Fill({
+      color: 'rgba('+color.join(',')+',1)',
+    }),
+  });
+}
+
+
+/** Create style function to draw features
+ *	ie. transform ignStyle in openlayers style
+ * @param {*} options
+ *	@param {boolean} options.ghost true to show a ghost feature when size=0
+ *	@param {string} options.clusterColor a color, default red / orange / green
+ *	@param {boolean} options.clusterDash border is dash, default true
+ */
+function getStyleFn(options) {
+  if (!options) options = {};
+
+  let clusterColor; 
+  let clusterTextColor = '#fff';
+  if (options.clusterColor) {
+    clusterColor = ol_color_asArray(options.clusterColor).slice(0, 3);
+    clusterTextColor = isDarkColor(clusterColor) ? '#fff' : '#000';
+  }
+  const clusterDash = options.clusterDash;
+  const optId = (options.clusterColor||'')+'-'+(options.clusterDash === false ? 0 : 1);
+
+  // Clusters style
+  return function(f, res, clustered) {
+    // Reset cache on PixelRatio change
+    if (_cachePixelRatio !== window.devicePixelRatio) {
+      clearCache();
+    }
+    var style;
+    if (f.get('features')) {
+      var cluster = f.get('features');
+      if (cluster.length == 1) {
+        f = cluster[0];
+      } else {
+        var size = cluster.length;
+        var styleid = 'cluster:'+size+'-'+optId;
+        style = _cacheStyle[styleid];
+        if (!style) {
+          style = _cacheStyle[styleid] = new ol_style_Style({
+            image: clusterImage({ size: size, color: clusterColor, dash: clusterDash }),
+              text: new ol_style_Text({
+                text: size.toString(),
+                  fill: new ol_style_Fill({
+                    color: clusterTextColor,
+                  }),
+              }),
+          });
+        }
+        return [style];
+      }
+    }
+    // Convert ignStyle to openlayers style
+    var s = getIgnStyle(f, res);
+    var typeGeom = f.getGeometry().getType();
+    // Etiquette
+    var label = f.get(s.labelAttribute) || s.labelAttribute;
+
+    // Cache id for the style
+    var id = getStyleId(s, clustered);
+    // Main style
+    var st;
+    if (!(st = _cacheStyle[id.main])) {
+      var strokeDash = s.strokeDash;
+      if (strokeDash &amp;&amp; typeof(strokeDash) == 'string') {
+        strokeDash = s.strokeDash.split(',');
+        if (s.strokeWidth > 0) {
+          for (var i in strokeDash) {
+            strokeDash[i] = Math.max(0, (Number(strokeDash[i])+2*(i%2)-1) * s.strokeWidth) * (ol_has_DEVICE_PIXEL_RATIO||1);
+          }
+        }
+      }
+      var img;
+      if (clustered &amp;&amp; typeGeom!=='Point') {
+        img = clusterImage({size:1, color:clusterColor});
+      } else if (s.pointIcon) {
+        var icon = /^https?:\/\//.test(s.pointIcon) ? s.pointIcon : IMAGE_SERVER+'image/voir/'+s.pointIcon;
+        img = new ol_style_Photo({
+          src: icon,
+          radius: s.pointRadius,
+          onload: function() {
+            f.changed();
+          },
+          stroke: new ol_style_Stroke({
+            width: 0,
+            color: 'transparent',
+          }),
+        });
+      } else {
+        if (options.ghost &amp;&amp; !label &amp;&amp; !s.pointRadius) {
+          img = new ol_style_Circle({
+            radius: 5,
+            fill: new ol_style_Fill({
+              color: 'rgba(0,0,0,0.5)',
+            }),
+            stroke: new ol_style_Stroke({
+              color: 'rgba(255,255,255,1)',
+              width: 1.5,
+            })
+          });
+        } else {
+          img = new ol_style_FontSymbol({
+            radius: s.pointRadius,
+            glyph: s.pointGlyph,
+            color: s.symbolColor,
+            form: s.pointForm || (s.pointGlyph ? undefined : 'circle'),
+            rotation: s.pointRotation *Math.PI/180,
+            gradient: Number(s.pointGradient),
+            offsetX: 0,
+            offsetY: -s.pointOffsetY * s.pointRadius,
+            fill: new ol_style_Fill({
+              color: s.pointGlyph ? s.pointColor : s.symbolColor,
+            }),
+            stroke: new ol_style_Stroke({
+              color: s.pointStrokeWidth ? s.pointStrokeColor : 'transparent',
+              width: Math.min(s.pointStrokeWidth, s.pointRadius/2),
+            }),
+          });
+        }
+      }
+      var fill;
+      if (s.fillPattern &amp;&amp; s.fillPattern != 'vide') {
+        fill = new ol_style_FillPattern({
+          pattern: s.fillPattern,
+          image: (s.fillPattern == 'Image (PNG)') ? new ol_style_Icon({ src: PATH_MACARTE + 'macarte/img/pattern.png' }) : undefined,
+          ratio: 1,
+          color: s.fillColor,
+          size: s.sizepattern,
+          spacing: s.spacingPattern,
+          angle: s.anglePattern,
+          offset: s.offsetPattern,
+          scale: s.scalePattern,
+          fill: new ol_style_Fill({color: s.fillColorPattern}),
+        });
+      } else {
+        fill = new ol_style_Fill({
+          color: s.fillColor,
+        });
+      }
+      var stroke = new ol_style_Stroke({
+        color: s.strokeWidth ? s.strokeColor : ((options.ghost &amp;&amp; /line/i.test(typeGeom)) ? 'rgba(0,0,0,0.25)' : 'transparent'),
+        width: s.strokeWidth || ((options.ghost &amp;&amp; /line/i.test(typeGeom)) ? 0.5 : 0),
+        lineDash: strokeDash,
+      });
+      st = _cacheStyle[id.main] = new ol_style_Style({
+        image: img,
+        fill: fill,
+        stroke: stroke,
+        geometry: function(f) {
+          // Cluster ?
+          var features = f.get('features');
+          return (features &amp;&amp; features.length===1) ? f.get('features')[0].getGeometry() : f.getGeometry();
+        },
+      });
+      // console.log("style main")
+    }
+    style = [st];
+    // Shadow
+    if (s.pointShadow &amp;&amp; typeGeom == 'Point') {
+        if (!(st = _cacheStyle[id.shadow+'-'+s.pointRadius])) {
+        st = _cacheStyle[id.shadow+'-'+s.pointRadius] = new ol_style_Style({
+          image: new ol_style_Shadow({
+            radius: s.pointRadius * 0.5,
+          }),
+          zIndex: -1,
+          geometry: function(f) {
+            // Cluster ?
+            var features = f.get('features');
+            return (features &amp;&amp; features.length===1) ? f.get('features')[0].getGeometry() : f.getGeometry();
+          },
+        });
+        // console.log("style shadow")
+      }
+      style.unshift( st );
+    } else if (!clustered &amp;&amp; s.strokeArrow &amp;&amp; typeGeom == 'LineString') {
+      // Stroke Arrow
+      var g = f.getGeometry().getCoordinates();
+      var p1 = g.pop();
+      var p2 = g.pop();
+      var rot = 0;
+        if (p1 &amp;&amp; p2) {
+        rot = Math.atan2(p2[0] - p1[0], p2[1] - p1[1]);
+      }
+      if (!(st = _cacheStyle[id.arrow])) {
+        var width = s.strokeWidth + 6;
+        _cacheStyle[id.arrow] = st = new ol_style_Style({
+          image: new ol_style_FontSymbol({
+            form: s.strokeArrow,
+            radius: width,
+            offsetY: s.strokeArrow==='triangle' ? -5 : 0,
+            rotation: rot,
+            rotateWithView: true,
+            fill: new ol_style_Fill({
+              color: s.strokeColor,
+            }),
+          }),
+          geometry: function(f) {
+            // Cluster ?
+            return (f.get('features')) ? new ol_geom_Point(f.get('features')[0].getGeometry().getLastCoordinate()) : new ol_geom_Point(f.getGeometry().getLastCoordinate());
+          }
+        });
+        // console.log("style arrow")
+      }
+      st.getImage().setRotation(rot);
+      style.push(st);
+    }
+    // Label
+    if (label) {
+      if (!(st = _cacheStyle[id.text])) {
+        if (typeGeom != 'Point') {
+          s.textAlign = 'center';
+          s.textBaseline = 'middle';
+        }
+        if (!s.textOutlineColor) {
+          try {
+            s.textOutlineColor = isDarkColor(ol_color_asArray(s.textColor)) ? [255, 255, 255, 0.6] : [0, 0, 0, 0.6];
+          } catch (e) {
+            s.textOutlineColor = [255, 255, 255, 0.6];
+          }
+        }
+        st = _cacheStyle[id.text] = new ol_style_Style({
+          text: new ol_style_Text({
+            font: s.textStyle + ' ' + s.textSize + 'px ' + s.textFont,
+              fill: new ol_style_Fill({color: s.textColor}),
+              stroke: new ol_style_Stroke({color: s.textOutlineColor, width: s.textOutlineWidth}),
+              textAlign: s.textAlign,
+              textBaseline: s.textBaseline,
+              overflow: true,
+              offsetX: (s.textAlign=='left') ? s.pointRadius : (s.textAlign=='right') ? -s.pointRadius : 0,
+              offsetY: /^top|^hanging/.test(s.textBaseline) ? s.pointRadius : /^bottom|^alphabetic/.test(s.textBaseline) ? -s.pointRadius : 0,
+          }),
+          geometry: function(f) {
+            // Cluster ?
+            var features = f.get('features');
+            return (features &amp;&amp; features.length===1) ? f.get('features')[0].getGeometry() : f.getGeometry();
+          },
+        });
+        // console.log("style text",s)
+      }
+      // Label avec affichage conditionnel si le champ est vide
+      st.getText().setText(label.replace ? f.getLabelContent("(("+label.replace(/\\n/g, '\n')+"))") : f.getLabelContent("(("+label+"))"));
+      style.push( st );
+    }
+    if (!label)	label = '';
+    // cas annotation, affiche un petit disque
+    if (!label.trim().length &amp;&amp; !s.pointRadius) {
+      var ret = [new ol_style_Style({
+        fill: new ol_style_Fill({
+          color: 'rgba(255, 255, 255, 0.2)',
+        }),
+        stroke: new ol_style_Stroke({
+          color: '#ffcc33',
+          width: 2,
+        }),
+        image: new ol_style_Circle({
+          radius: 4,
+          fill: new ol_style_Fill({
+            color: '#ffcc33',
+          }),
+        }),
+        geometry: function(f) {
+          // Cluster ?
+          var features = f.get('features');
+          return (features &amp;&amp; features.length===1) ? f.get('features')[0].getGeometry() : f.getGeometry();
+        },
+      })];
+      return ret;
+    }
+    return style;
+  };
+}
+
+/** Get select Style
+ * @param {*} options
+ *  @param {zoom | overlay | highlight | box } options.type select style type, default box
+ *  @param {boolen} options.showObject show the object, default true
+ *  @param {ol.style.Image | function | false | undefined} options.points style for lines points or false to hide points, default red points
+ *  @param { ol_style_Stroke | undefined } options.stroke default red, 2px
+ *  @param {number | undefined} options.radius radius for the points, default 5
+ *  @param {function | undefined} options.styleFn a style function
+ * @return {function} style function
+ */
+function getSelectStyleFn(options) {
+  options = options || {};
+  var style = options.styleFn || getStyleFn();
+
+  var stroke = options.stroke || new ol_style_Stroke({
+    color: 'red',
+    width: 2,
+  });
+  var fill = options.fill || new ol_style_Fill({
+    color: 'rgba(255,0,0,0.5)',
+  });
+  var radius = options.radius || 5;
+  var color = stroke.getColor();
+  var showObject = options.showObject !== false;
+
+  var pts = options.points instanceof ol_style_Image ? options.points : new ol_style_Circle({
+    stroke: new ol_style_Stroke({
+      color: color,
+      width: 1,
+    }),
+    radius: 5,
+  });
+  var ptsStyle = new ol_style_Style({
+    image: pts,
+    geometry: getGeomPoints,
+    zIndex: Infinity
+  });
+  var strokePoint = new ol_style_Stroke({
+    color: color,
+    width: 5,
+  });
+
+  var fillStyle = new ol_style_Style({
+    // stroke: new ol_style_Stroke({ color:'transparent'}),
+    fill: fill,
+    zIndex: Infinity
+  });
+
+  var overlay = new ol_style_Style({
+    image: new ol_style_Circle({
+      stroke: stroke,
+      fill: fill,
+      radius: radius,
+    }),
+    stroke: stroke,
+    fill: fill,
+    zIndex: Infinity
+  });
+
+  return function(f, res) {
+    var s;
+    const points = options.features.getLength() > 10 ? false : options.points;
+    switch (options.type) {
+      case 'highlight':
+      case 'zoom': {
+        // Feature style
+        var s0 = style(f, res);
+        s = [];
+        //for (var i=0, si0; si0=s0[i]; i++) 
+        s0.forEach((si0) => {
+          var si = si0.clone();
+          if (si.getImage()) {
+            si.getImage().setScale(1.25);
+            si.getImage().setRotation(si0.getImage().getRotation());
+          }
+          var a = si.getStroke();
+          if (a) {
+            a.setWidth(a.getWidth()+3);
+          }
+          si.setZIndex(Infinity);
+          s.push(si);
+        });
+        s.push(fillStyle);
+        if (points) s.push(ptsStyle);
+        return s;
+      }
+      case 'overlay': {	// Feature style
+        s = showObject ? style(f, res) : [];
+        s.push(overlay);
+        if (points) s.push(ptsStyle);
+        return s;
+      }
+      default: {	// Feature style
+        s = showObject ? style(f, res) : [];
+        // Add
+        var g = f.getGeometry();
+        if (g.getType()=='Point') {
+          var cluster = f.get('features');
+          if (cluster) {
+            if (cluster.length==1) {
+              f = cluster[0];
+              cluster = false;
+            }
+          }
+          if (!cluster) {
+            s.unshift(new ol_style_Style({
+              image: new ol_style_Circle({
+              stroke: strokePoint,
+                radius: (f.getIgnStyle('pointRadius') || 5) +radius,
+              }),
+              zIndex: Infinity
+            }));
+          }
+        } else {
+          if (points) {
+            s.push(ptsStyle);
+          }
+          s.unshift(new ol_style_Style({
+            stroke: stroke,
+            geometry: fromExtent( g.getExtent() ),
+            zIndex: Infinity
+          }));
+        }
+
+        return s;
+      }
+    }
+  }
+}
+
+export { getStyleFn }
+export { getSelectStyleFn }
+export { defaultIgnStyle }
+export { clearCache }
+export { getIgnStyle }
+export { ordering }</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="module-dialog_url.html">dialog/url</a></li><li><a href="module-font_loadFonts.html">font/loadFonts</a></li><li><a href="module-layout.html">layout</a></li><li><a href="module-layout_JCSSRule.html">layout/JCSSRule</a></li><li><a href="module-md_md2html.html">md/md2html</a></li><li><a href="module-style_ignStyleFn.html">style/ignStyleFn</a></li><li><a href="module-version_toV4.html">version/toV4</a></li></ul><h3>Namespaces</h3><ul><li><a href="JSONFile.html">JSONFile</a></li><li><a href="JSONOptions.html">JSONOptions</a></li></ul><h3>Classes</h3><ul><li><a href="BaseFormat.html">BaseFormat</a></li><li><a href="Carte.html">Carte</a></li><li><a href="CarteFormat.html">CarteFormat</a></li><li><a href="CGU.html">CGU</a></li><li><a href="cloneFeature.html">cloneFeature</a></li><li><a href="GeoImage.html">GeoImage</a></li><li><a href="GeoportailFormat.html">GeoportailFormat</a></li><li><a href="I18N.html">I18N</a></li><li><a href="LayerFormat.html">LayerFormat</a></li><li><a href="Legend.html">Legend</a></li><li><a href="MousePosition.html">MousePosition</a></li><li><a href="Statistic.html">Statistic</a></li><li><a href="StoryMap.html">StoryMap</a></li><li><a href="StoryMapFormat.html">StoryMapFormat</a></li><li><a href="VectorStyle.html">VectorStyle</a></li><li><a href="VectorStyleFormat.html">VectorStyleFormat</a></li><li><a href="WMS.html">WMS</a></li></ul><h3>Events</h3><ul><li><a href="global.html#event:read">read</a></li></ul><h3>Global</h3><ul><li><a href="global.html#_T">_T</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 3.6.7</a> on Tue Oct 26 2021 17:05:45 GMT+0200 (heure d’été d’Europe centrale)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>

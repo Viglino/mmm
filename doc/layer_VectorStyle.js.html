@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: layer/VectorStyle.js</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: layer/VectorStyle.js</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>﻿import ol_inherits from 'ol-ext/util/ext'
+import ol_layer_Group from 'ol/layer/Group'
+import ol_layer_Vector from 'ol/layer/Vector'
+import ol_layer_VectorImage from 'ol/layer/VectorImage'
+import ol_source_Cluster from '../ol/source/Cluster'
+import ol_layer_AnimatedCluster from 'ol-ext/layer/AnimatedCluster'
+import ol_geom_Point from 'ol/geom/Point'
+import { getCenter as ol_extent_getCenter } from 'ol/extent'
+
+import '../ol/Feature'
+import loadFonts from '../font/loadFonts'
+import { getStyleFn, defaultIgnStyle, clearCache, getIgnStyle, ordering } from '../style/ignStyleFn'
+
+/** Layer with a style function based on IGN style.
+ *	Features in the layer are linked to the layer (f.getLayer() to get the layer it belongs to).
+ *
+ * @constructor
+ * @extends {ol_layer_Vector}
+ * @param {olx.layer.VectorOptions=} options Options, extend olx.layer.VectorOptions.
+ *	@param {boolean} options.ghostStyle true to show a ghost feature when size=0
+ */
+const VectorStyle = function(options) {
+  options = options || {};
+
+  // Constructor
+  ol_layer_Group.call(this, options);
+
+  // Render order based on the zindex
+  options.renderOrder = ordering;
+  // Style function for the layer
+  options.style = getStyleFn({ ghost: options.ghostStyle });
+  //
+  options.displayInLayerSwitcher = false;
+  options.dessin = true;
+  options.popupHoverSelect = false;
+  // Create layer vector
+  this.layerVector_ = new ol_layer_Vector(options);
+  // Selectable
+  this.layerVector_.selectable = () => {
+    return this.selectable();
+  }
+  this.layerVector_.set('name', 'vector');
+  this.getLayers().push(this.layerVector_);
+  // Features
+  var features = this.getSource().getFeatures();
+  // for (var i=0, f; f=features[i]; i++) 
+  features.forEach(f => f._layer = this );
+
+  this.setMode('vector');
+
+  // Handle membership
+  this.getSource().on('addfeature', (function(e) {
+    e.feature._layer = this;
+    if (options.onaddfeature) {
+      options.onaddfeature(e);
+    }
+  }).bind(this));
+  this.getSource().on('removefeature', (function(e) {
+    delete e.feature._layer;
+  }).bind(this));
+
+  // Clear the cache and force redraw when fonts are loaded
+  loadFonts(() => {
+    this.clearCache();
+    this.layerVector_.changed();
+  });
+
+  // Handle cluster maxZoom
+  this.layerVector_.on('prerender', (e) => {
+    if (this.getMode() === 'cluster' &amp;&amp; e.frameState.viewState.zoom &lt;= this.get('maxZoomCluster')) {
+      this.layerVector_.setVisible(false);
+      this.layerCluster_.setVisible(true);
+      this.activateCluster(true);
+    }
+  })
+};
+ol_inherits(VectorStyle, ol_layer_Group);
+
+/** Get Layer source
+ */
+VectorStyle.prototype.getSource = function() {
+  return this.layerVector_.getSource();
+};
+
+/** Get layer style
+ */
+VectorStyle.prototype.getStyle = function() {
+  return this.layerVector_.getStyle();
+};
+
+/** Get geometry type of a layer or test if it has type as geometry
+ * @param {ol.geom.GeometryType|undefined} type the type of geom to look for or default to get an array of types, default undefined
+ * @return {boolean|Object} if type is specified checks if all features are of this type,  otherwise returns an array of type
+ */
+VectorStyle.prototype.getGeomTypes = function(type) {
+  var types = {};
+  var features = this.getSource().getFeatures();
+  features.forEach(f => types[f.getGeometry().getType()] = true);
+  if (type) {
+    if (Object.getOwnPropertyNames(types).length>2)	return false;
+    else return types[type];
+  } else return types;
+};
+
+/** Get popupcontent for a feature
+ *	@param {ol.Feature|undefined} f the feature to get information on, if undefined get the popupcontent of the layer
+ *	@return {html} popupcontent
+ */
+VectorStyle.prototype.getPopupContent = function(f) {
+  if (f) return f.getPopupContent( this._popupContent || {} );
+  return this._popupContent || {};
+};
+
+/** Set popupcontent for a feature
+*	@param {ol.Feature|undefined} f the feature, default set the poupcontent of the layer
+*	@param {string} content
+*/
+VectorStyle.prototype.setPopupContent = function(content) {
+  if (!content || content instanceof Array) this._popupContent = {};
+  else this._popupContent = content;
+};
+
+/** Set default ignStyle for a layer
+ *	@param {string|ignStyle} property the property to set
+ *	@param {string|number} val the value to set
+ */
+VectorStyle.prototype.setIgnStyle = function(property, val) {
+  if (!this._ignStyle  || Array.isArray(this._ignStyle)) this._ignStyle = {};
+  if (val===undefined) {
+    this._ignStyle = property;
+  } else if (val!=='' &amp;&amp; /width|radius|size|offset/i.test(property)) {
+    val = Number(val);
+  }
+  if (val !== '' &amp;&amp; val != VectorStyle.prototype.defaultIgnStyle[property]) {
+    this._ignStyle[property] = val;
+  } else {
+    delete this._ignStyle[property];
+  }
+};
+
+/** Get ignStyle for the layer or a feature
+ *	@param {ol.Feature | undefined} f the feature, undefined to get the layer's default style
+ *	@param {number} res current resolution
+ *	@param {Object} ignStyle
+ */
+VectorStyle.prototype.getIgnStyle = function(f /*, res */) {
+  // returns default style
+  if (!f) return this._ignStyle;
+
+  return getIgnStyle(f);
+};
+
+/** Default IGN style
+ */
+VectorStyle.prototype.defaultIgnStyle = defaultIgnStyle;
+
+
+/** Clear cache
+ */
+VectorStyle.prototype.clearCache = function() {
+  clearCache();
+};
+
+/** Set render as an image
+ * @param {vector|image|cluster} [mode=vector] render mode
+ * @param {*} options
+ *  @param {number} options.distance cluster distance in px
+ *	@param {string} options.clusterColor a color, default red / orange / green
+ *	@param {boolean} options.clusterDash border is dash, default true
+ */
+VectorStyle.prototype.setMode = function(mode, options) {
+  options = options || {};
+  this._renderMode = mode;
+  this.layerVector_.setVisible(false);
+  if (this.layerImage_) {
+    this.layerImage_.setVisible(false);
+  }
+  if (this.layerCluster_) {
+    this.layerCluster_.setVisible(false);
+    this.activateCluster(false);
+  }
+  switch (mode) {
+    case 'cluster':{
+      // Create cluster layer when needed
+      if (!this.layerCluster_ ) {
+        var clusterSource = new ol_source_Cluster({
+          // Get objets as point
+          geometryFunction: function(f) {
+            var g = f.getGeometry();
+            if (g.getType()==='Point') {
+              return g;
+            } else {
+              return new ol_geom_Point(ol_extent_getCenter(g.getExtent()));
+            }
+          },
+          distance: options.distance || 40,
+          source: this.getSource(),
+        });
+        this.layerCluster_ = new ol_layer_AnimatedCluster({
+          name: 'cluster',
+          displayInLayerSwitcher: false,
+          source: clusterSource,
+          animationDuration: options.animationDuration,
+        });
+        this.getLayers().push(this.layerCluster_);
+        // Selectable
+        this.layerCluster_.selectable = () => {
+          return this.selectable();
+        }
+      }
+      this.activateCluster(true);
+      this.layerCluster_.setStyle(getStyleFn(options));
+      this.layerCluster_.setVisible(true);
+      // Handle cluster maxZoom
+      this.layerCluster_.on('prerender', (e) => {
+        if (e.frameState.viewState.zoom > this.get('maxZoomCluster')) {
+          this.layerVector_.setVisible(true);
+          this.layerCluster_.setVisible(false);
+          this.activateCluster(false);
+        }
+      })
+      break;
+    }
+    case 'image': {
+      // Create a vector image
+      if (!this.layerImage_ ) {
+        this.layerImage_ = new ol_layer_VectorImage({
+          name: 'image',
+          displayInLayerSwitcher: false,
+          source: this.getSource(),
+          style: this.getStyle(),
+          attributions: this.getSource().getAttributions(),
+          projection: this.getSource().getProjection(),
+          minResolution: this.layerVector_.getMinResolution(),
+          maxResolution: this.layerVector_.getMaxResolution(),
+          renderOrder: ordering
+        })
+        this.getLayers().push(this.layerImage_);
+        // Selectable
+        this.layerImage_.selectable = () => {
+          return this.selectable();
+        }
+      }
+      this.layerImage_.setVisible(true);
+      break;
+    }
+    default: {
+      this.layerVector_.setVisible(true);
+      break;
+    }
+  }
+};
+
+/** Check if layer is selectable
+ * @param {boolean} selectable if define set selectable
+ * @returns {boolean}
+ */
+VectorStyle.prototype.selectable = function(b) {
+  if (b===true) this.set('selectable', true);
+  else if (b===false) this.set('selectable', false);
+  return this.get('selectable') !== false;
+};
+
+/** Get render mode
+ *	@return {vector|image|cluster} render mode
+ */
+VectorStyle.prototype.getMode = function() {
+  return this._renderMode || 'vector';
+};
+
+/** Activate cluster calculation. Deactivate calculation before doing large operation on source
+ * @param {boolean} b
+ */
+VectorStyle.prototype.activateCluster = function(b) {
+  if (this.layerCluster_) {
+    this.layerCluster_.getSource().set('inactive', !b);
+    if (b) {
+      this.layerCluster_.getSource().refresh();
+    }
+  }
+};
+
+export default VectorStyle
+</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="module-dialog_url.html">dialog/url</a></li><li><a href="module-font_loadFonts.html">font/loadFonts</a></li><li><a href="module-layout.html">layout</a></li><li><a href="module-layout_JCSSRule.html">layout/JCSSRule</a></li><li><a href="module-md_md2html.html">md/md2html</a></li><li><a href="module-style_ignStyleFn.html">style/ignStyleFn</a></li><li><a href="module-version_toV4.html">version/toV4</a></li></ul><h3>Namespaces</h3><ul><li><a href="JSONFile.html">JSONFile</a></li><li><a href="JSONOptions.html">JSONOptions</a></li></ul><h3>Classes</h3><ul><li><a href="BaseFormat.html">BaseFormat</a></li><li><a href="Carte.html">Carte</a></li><li><a href="CarteFormat.html">CarteFormat</a></li><li><a href="CGU.html">CGU</a></li><li><a href="cloneFeature.html">cloneFeature</a></li><li><a href="GeoImage.html">GeoImage</a></li><li><a href="GeoportailFormat.html">GeoportailFormat</a></li><li><a href="I18N.html">I18N</a></li><li><a href="LayerFormat.html">LayerFormat</a></li><li><a href="Legend.html">Legend</a></li><li><a href="MousePosition.html">MousePosition</a></li><li><a href="Statistic.html">Statistic</a></li><li><a href="StoryMap.html">StoryMap</a></li><li><a href="StoryMapFormat.html">StoryMapFormat</a></li><li><a href="VectorStyle.html">VectorStyle</a></li><li><a href="VectorStyleFormat.html">VectorStyleFormat</a></li><li><a href="WMS.html">WMS</a></li></ul><h3>Events</h3><ul><li><a href="global.html#event:read">read</a></li></ul><h3>Global</h3><ul><li><a href="global.html#_T">_T</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 3.6.7</a> on Tue Oct 26 2021 17:05:45 GMT+0200 (heure d’été d’Europe centrale)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>

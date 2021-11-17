@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: md/md2html.js</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: md/md2html.js</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>﻿/*
+ *	Copyright (c) 2016 Jean-Marc VIGLINO (https://github.com/Viglino),
+ *	released under the CeCILL-B license (French BSD license)
+ *	(http://www.cecill.info/licences/Licence_CeCILL-B_V1-en.txt).
+ *
+ */
+/* eslint no-useless-escape: "off" */
+/* eslint no-constant-condition: ["error", { "checkLoops": false }]*/
+/** @module md/md2html */
+
+import './md2html.css'
+
+import config from '../config/config'
+import '../dialog/fullscreen'
+import ol_ext_element from 'ol-ext/util/element';
+
+// document.write('&lt;script async src="https://platform.twitter.com/widgets.js" charset="utf-8">&lt;/script>')
+const head = document.getElementsByTagName("head")[0] || document.documentElement;
+const script = document.createElement("script");
+script.type = "text/javascript";
+script.src = "https://platform.twitter.com/widgets.js"
+head.appendChild(script);
+
+/** Simple markdown to html convertor
+ * @param {String} md the markdown text
+ * @param {} data a list of key value to replace in the markdown %key%
+ * @return {HTMl} HTML code
+ */
+var md2html = function (md, data) {
+  var i;
+  data = data || {};
+  md = md || '';
+  // Encoder les URI
+  for (i in data) {
+    if (/^https?:\/\/(www\.)?[-a-zA-Z0-9@:%._+~#=]{2,256}\.[a-z]{2,6}\b([-a-zA-Z0-9@:%_+.~#?&amp;//=]*)/.test(data[i])
+      &amp;&amp; !/%/.test(data[i])){
+      data[i] = encodeURI(data[i]).replace(/\'/g,"%27");
+    }
+  }
+
+  // Secure md string
+  md = "\n" + md2html.doSecure(md) +"\n";
+
+  // Images Base64 (save)
+  var data64 = [];
+  md = md2html.saveImage64(md, data64);
+
+  // Handle icons
+  md = md2html.doIcons(md);
+
+  // Handle blocks
+  md = md2html.doBlocks(md);
+
+  // Table management
+  md = md2html.doTable(md);
+  // Data management
+  md = md2html.doData(md, data);
+  md = md2html.saveImage64(md, data64);
+  // RegEpx rules
+  for (i=0; i&lt;md2html.rules.length; i++) {
+    md = md.replace(md2html.rules[i][0], md2html.rules[i][1]);
+  }
+  // Clean up
+  md = md2html.cleanUp(md);
+//	console.log(md)
+
+  // Images Base64 (injection)
+  md = md2html.restoreImage64(md, data64);
+  // Floating images
+  md = md2html.floatingImages(md);
+  return md;
+};
+
+/** Transform md to simple text
+ * /
+var md2text = function (md, data) {
+    return md2html.doData(md, data);
+
+    //return $("&lt;div>").html(md2html(md, data)).text();
+}
+/**/
+
+/**
+ * Server to load image (default use the current url)
+ */
+md2html.server = config.server;
+
+/** 
+ * floating images
+ */
+md2html.floatingImages = function (md) {
+  md = md.replace (/&lt;div class='right'>&lt;img([^\&lt;]*)&lt;\/div>/g,"&lt;img class='floatRight' $1");
+  md = md.replace (/&lt;div class='left'>&lt;img([^\&lt;]*)&lt;\/div>/g,"&lt;img class='floatLeft' $1");
+  md = md.replace (/&lt;a ([^\&lt;]*)&lt;br \/>&lt;img/g,"&lt;a $1&lt;img");
+  return md;
+};
+
+/**
+ * Create collapsible blocks
+ */
+md2html.doBlocks = function (md) {
+  md = md.replace(/\n\[----\]/g, '\n&lt;/div>&lt;/div>');
+  var nb = 0;
+  var md2;
+  var rex = /\n\[--(.*)--\]/;
+  while (true) {
+    md2 = md.replace(rex, 
+      '\n&lt;/div>&lt;/div>'
+      +'&lt;input class="mdBlock" id="_mdBlock_'+nb+'" type="checkbox"/>'
+      +'&lt;div class="mdBlock">'
+      +'&lt;label for="_mdBlock_'+nb+'" class="mdBlockTitle">\n'
+      +'$1'
+      +'\n&lt;/label>'
+      +'&lt;div class="mdBlockContent">'
+    );
+    if (md2===md) break;
+    else md = md2;
+    nb++;
+  }
+  rex = /\n\[\+\+(.*)\+\+\]/;
+  while (true) {
+    md2 = md.replace(rex, 
+      '\n&lt;/div>&lt;/div>'
+      +'&lt;input class="mdBlock" id="_mdBlock_'+nb+'" checked="checked" type="checkbox"/>'
+      +'&lt;div class="mdBlock">'
+      +'&lt;label for="_mdBlock_'+nb+'" class="mdBlockTitle">\n'
+      +'$1'
+      +'\n&lt;/label>'
+      +'&lt;div class="mdBlockContent">'
+    );
+    if (md2===md) break;
+    else md = md2;
+    nb++;
+  }
+
+  return md;
+};
+
+/** Save base64 image to avoid large file processing
+ * @param {string} md the markdown
+ * @param {Array&lt;string>} d64 an array of base64
+ */
+md2html.saveImage64 = function(md, d64) {
+  var rex = /\!\(data:image\/[^;]*;base64,([^\)]*)\)/g;
+  d64.push (md.match(rex));
+  return md.replace(rex, '&lt;base64-'+d64.length+'/>');
+};
+
+/** Restore base64 image after processing
+ * @param {string} md the markdown
+ * @param {Array&lt;string>} d64 an array of base64
+ */
+md2html.restoreImage64 = function(md, d64) {
+  for (var k=0; k&lt;d64.length; k++) {
+    var rex = new RegExp ('&lt;base64-'+(k+1)+'/>');
+    var img64 = d64[k];
+    if (img64 &amp;&amp; img64.length) {
+      for (var i=0; i&lt;img64.length; i++) {
+        md = md.replace(rex, '&lt;img src="'+img64[i].replace(/^\!\(/, "").replace(/\)$/, "")+'" />')
+      }
+    }
+  }
+  return md;
+};
+
+/** Add new rule
+*	@param {RegExp} rex RegExp to use in replacement
+*	@param {string} rep replacement string
+*	@return {string} result md
+*/
+md2html.addRule = function(rex, rep) {
+  md2html.rules.push(rex, rep);
+}
+
+/** Secure md string: remove code
+*	@param {string} md the markdown
+*	@return {string} result md
+*/
+md2html.doSecure = function(md) {
+  return md.replace(/&lt;/g, "&amp;lt;")
+    .replace(/>/g, "&amp;gt;")
+    .replace(/\'/g,"&amp;apos;")
+    .replace(/\"/g,"&amp;quot;");
+}
+
+/**
+ * 
+ */
+md2html.doIcons = function(md) {
+  md = md.replace(/:([a-z]*)-([_,a-z,0-9,-]*):(([a-z,0-9,-]*)?( ([a-z,0-9,-]+))?:)?(([#,0-9,a-z,A-Z]*):)?/g, '&lt;i class="fa $1-$2 fa-$4 fa-$6" style="color:$8 !important">&lt;/i>');
+  return md;
+}
+
+/** A list of key value to replace as %key% > value in md
+*	@param {string} md the markdown
+*	@param {Objevt} data list of key/value
+*	@return {string} result md
+*/
+md2html.doData = function(md, data) {
+  // Save ends of exp
+  md = md.replace(/\)\)/g,"‡");
+  md = md.replace(/\|\|/g,"‾");
+  for (var i in data) if (data[i]) {
+    // Conditional display
+    md = md.replace(new RegExp("\\(\\(\\?\%"+i+"%([^‡]*)‡",'g'), "$1");
+//		md = md.replace(new RegExp("\\(\\(?\%"+i+"%",'g'), "((?%%");
+    md = md.replace(new RegExp("%"+i+"%",'g'), data[i]);
+  }
+  // Conditional display: ((!%att% exp )) => exp / si att est vide
+  md = md.replace (/\(\(!\%([^\%](.*))\%([^‡]*)(‡)/g, "$3");
+  md = md.replace (/\(\(!([^‡]*)(‡)/g, "");
+  // Conditional display: ((?%att% exp )) => exp / si att est rempli
+//	md = md.replace (/\(\(\?\%\%([^\)\)]*)(\)\))/g, "$1");
+  md = md.replace (/\(\(\?([^‡]*)(‡)/g, "");
+  // Conditional display: (( exp %att% exp )) => exp att exp
+  md = md.replace (/(\(\()([^\%|‡]*)\%([^\%](.*))\%([^‡|‾]*)(‾)?([^‡|‾]*)(‡)/g, "$7");
+  md = md.replace (/\(\(([^‡|‾]*)(‾)?(.*)‡/g, "$1");
+  md = md.replace (/%%/g, "%");
+  // restore
+  md = md.replace(/‡/g,"))");
+  md = md.replace(/‾/g,"||");
+  return md;
+}
+
+/** Table handler
+*	@param {string} md the markdown
+*	@return {string} result md
+*/
+md2html.doTable = function(md) {
+  // Detect ---- | ----
+  md = md.replace(/\n\ ?-{3,}\ ?\|/g, '&lt;table>&lt;/table>|');
+  while (/&lt;\/table>\|\ ?-{3,}/.test(md)) {
+    md = md.replace(/&lt;\/table>\|\ ?-{3,}\ ?/g, '&lt;/table>');
+  }
+  // Header
+  md = md.replace(/(.*)&lt;table>/g, '&lt;table>&lt;tr>&lt;td>$1&lt;/td>&lt;/tr>');
+  while (/&lt;td>(.*)\|/.test(md)) {
+    md = md.replace(/&lt;td>(.*)\|/g, '&lt;td>$1&lt;/td>&lt;td>');
+  }
+  // Lines
+  while (/&lt;\/table>\n([^\n]*)\|/.test(md)) {
+    md = md.replace(/&lt;\/table>\n(.*)/g, '&lt;tr>&lt;td>$1&lt;/td>&lt;/tr>&lt;/table>');
+    while (/&lt;td>(.*)\|/.test(md)) {
+      md = md.replace(/&lt;td>(.*)\|/g, '&lt;td>$1&lt;/td>&lt;td>');
+    }
+  }
+  md = md.replace(/&lt;\/table>\n/g,"&lt;/table>");
+  md = md.replace(/&lt;td>\t/g,"&lt;td class='center'>");
+  return md;
+}
+
+/** Clean endl
+ *	@param {string} md the markdown 
+ *	@return {string} result md
+ */
+md2html.cleanUp = function(md) {	
+  md = md.replace(/(\&lt;\/h[1-5]\>)\n/g, "$1");
+  md = md.replace(/^\n/, '');
+  if (md==='\n') md = '';
+
+  // Remove timeline tweet
+  md = md.replace(/data-tweet-limit\=\"\"/g,'data-tweet-limit="1"');
+  md = md.replace (/&lt;div class='right'>&lt;a class="twitter-/g,"&lt;div class='floatRight'>&lt;a class=\"twitter-")
+  md = md.replace (/&lt;div class='left'>&lt;a class="twitter-/g,"&lt;div class='floatLeft'>&lt;a class=\"twitter-")
+  md = md.replace (/&lt;div class='right'>&lt;blockquote /g,"&lt;div class='floatRight' style=\"min-width:200px\">&lt;blockquote ")
+  md = md.replace (/&lt;div class='left'>&lt;blockquote /g,"&lt;div class='floatLeft' style=\"min-width:200px\">&lt;blockquote ")
+  // Facebook
+  md = md.replace (/URL_PAGE_CARTE/g, encodeURIComponent(md2html.server)); // encodeURIComponent(window.location.href));
+  
+  // Clollapsible blocks
+  md = md.replace(/mdBlockTitle\">\n/g,'mdBlockTitle">');
+  md = md.replace(/mdBlockContent\">\n/g,'mdBlockContent">');
+  md = md.replace(/\n&lt;\/label>/g,'&lt;/label>');
+  md = md.replace(/\n&lt;\/div>&lt;\/div>/g,'&lt;/div>&lt;\/div>');
+  md = md.replace(/&lt;\/div>\n/g,'&lt;/div>');
+
+//	md = md.replace(/&lt;\/ul>\n{1,2}/g, '&lt;/ul>');
+//	md = md.replace(/\&lt;\/ol\>\n{1,2}/g, '&lt;/ol>');
+
+  md = md.replace(/&lt;\/p>\n/g, '&lt;/p>');
+
+  md = md.replace(/(\&lt;\/h[0-9]>)\n/g, '$1');
+  md = md.replace(/(\&lt;hr \/>)\n/g, '$1');
+  md = md.replace(/\n/g, '&lt;br />');
+  md = md.replace(/\t/g, ' ');
+
+  // Image server
+  md = md.replace(/src="image\/voir\//g, 'src="'+md2html.server+'image/voir/');
+  return md;
+}
+
+/** Array of RegExp rules for conversion
+ */
+md2html.rules = [
+  // Headers
+  [/#?(.*)\n={5}(.*)/g, "&lt;h1>$1&lt;/h1>"],				// h1
+// [/#?(.*)\n\-{5}(.*)/g, "&lt;h2>$1&lt;/h2>"],				// h2
+
+  [/\n#{6}(.*)/g, "\&lt;h6>$1&lt;/h6>"],					// h5
+  [/\n#{5}(.*)/g, "\n&lt;h5>$1&lt;/h5>"],					// h5
+  [/\n#{4}(.*)/g, "\n&lt;h4>$1&lt;/h4>"],					// h4
+  [/\n#{3}(.*)/g, "\n&lt;h3>$1&lt;/h3>"],					// h3
+  [/\n#{2}(.*)/g, "\n&lt;h2>$1&lt;/h2>"],					// h2
+  [/\n#{1}(.*)/g, "\n&lt;h1>$1&lt;/h1>"],					// h1
+
+  [/&lt;h([1-6])>\t/g, "&lt;h$1 class='center'>"],			// Center header with tab
+
+  // Blocks
+  [/\n\&amp;gt\;(.*)/g, '&lt;blockquote>$1&lt;/blockquote>'],	// blockquotes
+  [/\&lt;\/blockquote\>\&lt;blockquote\>/g, '\n'],			// fix
+  [/\n-{5,}/g, "\n&lt;hr />"],							// hr
+
+  // Lists
+  [/\n\* (.*)/g, '\n&lt;ul>&lt;li>$1&lt;/li>&lt;/ul>'],			// ul lists
+  [/\n {1,}\*\ ([^\n]*)/g, '&lt;ul2>&lt;li>$1&lt;/li>&lt;/ul2>'],	// ul ul lists
+  [/\n\t\*\ ([^\n]*)/g, '&lt;ul2>&lt;li>$1&lt;/li>&lt;/ul2>'],	// ul ul lists
+  [/&lt;\/ul2>&lt;ul2>/g, ''],								// concat
+  [/&lt;\/ul>&lt;ul2>([^\n]*)&lt;\/ul2>\n/g, '&lt;ul>$1&lt;/ul>&lt;/ul>'],// indent
+  [/\n\&lt;ul\>/g, '&lt;ul>'],								// fix
+  [/&lt;\/ul>&lt;ul>/g, ''],								// concat
+
+  // Ordered list
+  [/\n[0-9]+\.(.*)/g, '&lt;ol>&lt;li>$1&lt;/li>&lt;/ol>'],		// ol lists
+  [/\&lt;\/ol\>\&lt;ol\>/g, ''],							// fix
+
+  // Automatic links
+  [/([^\(])(https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{2,256}\.[a-z]{2,6}\b([-a-zA-Z0-9@:%_\+.~#?&amp;//=]*))( ?)/g, '$1&lt;a href=\'$2\' target="_blank">$2&lt;/a>'],
+  // Mailto
+  [/([^\(])\bmailto\b\:(\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b)/gi, '$1&lt;a href=\'mailto:$2\'>$2&lt;/a>'],
+
+
+  /* Twitter */
+
+  // Twitter Share
+  [ /\!(\[([^\[|\]]+)?\])?\(https:\/\/twitter.com\/share ?(\d+)?x?(\d+)?\)/g,
+    '&lt;a href="https://twitter.com/share" data-text="$2" data-hashtags="macarte" data-related="IGNFrance" class="twitter-share-button" data-show-count="true" target="_blank">Tweet&lt;/a>'],
+
+  // User timeline
+  [ /\!(\[([^\[|\]]+)?\])?\(https:\/\/twitter.com\/([^\/)]*)\/timeline ?(\d+)?x?(\d+)?\)/g,
+    '&lt;a class="twitter-timeline" href="https://twitter.com/$3" data-tweet-limit="$4" data-width="$5">&lt;a href="https://twitter.com/$3?cards=false">&lt;/a>&lt;/blockquote>'],
+  // Twitter timeline
+  [ /\!(\[([^\[|\]]+)?\])?\(https:\/\/twitter.com\/([^\/)]*)\/timelines\/([^ |\)]*) ?(\d+)?x?(\d+)?\)/g,
+    '&lt;a class="twitter-timeline" href="https://twitter.com/$3/timelines/$4" data-tweet-limit="$5" data-width="$6">&lt;a href="https://twitter.com/$3?cards=false">&lt;/a>&lt;/blockquote>'],
+  // Twitter grid
+  [ /\!(\[([^\[|\]]+)?\])?\(https:\/\/twitter.com\/([^\/)]*)\/timegrid\/([^ |\)]*) ?(\d+)?x?(\d+)?\)/g,
+    '&lt;a class="twitter-grid" href="https://twitter.com/$3/timelines/$4" data-limit="$5"  data-width="$6">&lt;a href="https://twitter.com/$3?cards=false">&lt;/a>&lt;/blockquote>'],
+  // Tweet
+  [ /\!(\[([^\[|\]]+)?\])?\(https:\/\/twitter.com\/([^ |\)]*) ?(\d+)?x?(\d+)?\)/g,
+    '&lt;blockquote class="twitter-tweet" data-cards="$4hidden" data-dnt="true" data-width="$5" width="$5">&lt;a href="https://twitter.com/$3?cards=false">&lt;/a>&lt;/blockquote>'],
+
+  // FaceBook like
+  [ /\!(\[([^\[|\]]+)?\])?\(https:\/\/www.facebook.com\/like ?(\d+)?x?(\d+)?\)/g,
+    '&lt;iframe src="https://www.facebook.com/plugins/like.php?href=URL_PAGE_CARTE&amp;width=136&amp;layout=button_count&amp;action=like&amp;size=small&amp;show_faces=false&amp;share=true&amp;height=20&amp;appId" width="136" height="20" class="facebook-share-button" scrolling="no" frameborder="0" allowTransparency="true" allow="encrypted-media">&lt;/iframe>'],
+
+  // Page FaceBook
+  [ /\!(\[([^\[|\]]+)?\])?\(https:\/\/www.facebook.com\/([^\/)]*)\/posts\/([^ |\)]*) ?(\d+)?x?(\d+)?\)/g,
+    '&lt;iframe src="https://www.facebook.com/plugins/post.php?href=https%3A%2F%2Fwww.facebook.com%2F$3%2Fposts%2F$4&amp;width=$5&amp;height=$6" width="$5" height="$6" style="border:none;overflow:hidden" scrolling="no" frameborder="0" allowTransparency="true" allow="encrypted-media">&lt;/iframe>'],
+  [ /\!(\[([^\[|\]]+)?\])?\(https:\/\/www.facebook.com\/([^ |\)]*) ?(\d+)?x?(\d+)?\)/g,
+    '&lt;iframe src="https://www.facebook.com/plugins/page.php?href=https%3A%2F%2Fwww.facebook.com%2F$3&amp;tabs=timeline&amp;width=$4" width="$4" height="$5" style="border:none;overflow:hidden" scrolling="no" frameborder="0" allowTransparency="true" allow="encrypted-media">&lt;/iframe>'],
+
+  /* Media */
+
+  // INA.fr
+  [ /\!(\[([^\[|\]]+)?\])?\(https:\/\/player.ina.fr\/player\/embed\/([^ |\)]*) ?(\d+)?x?(\d+)?\)/g,
+    '&lt;iframe class="video" width="300" height="180" frameborder="0" marginheight="0" marginwidth="0" scrolling="no" style="overflow:hidden;width:$4px; height:$5px;" src="https://player.ina.fr/player/embed/$3/wide/0" allowfullscreen>&lt;/iframe>'],
+  // INA/Jalon
+  [ /\!(\[([^\[|\]]+)?\])?\(InaEdu([^ |\)]*) ?(\d+)?x?(\d+)?\)/g,
+    '&lt;iframe class="video" width="300" height="180" style="width:$4px; height:$5px;" src="https://fresques.ina.fr/jalons/export/player/InaEdu$3/360x270" allowfullscreen>&lt;/iframe>'],
+  // Youtube
+  [ /\!(\[([^\[|\]]+)?\])?\(https?:\/\/youtu.be\/([^ |\)]*) ?(\d+)?x?(\d+)?\)/g,
+    '&lt;iframe class="video" width="300" height="180" style="width:$4px; height:$5px;" src="https://www.youtube.com/embed/$3" frameborder="0" allowfullscreen>&lt;/iframe>'],
+  // Dailymotion
+  [ /\!(\[([^\[|\]]+)?\])?\(https?:\/\/dai.ly\/([^ |\)]*) ?(\d+)?x?(\d+)?\)/g,
+    '&lt;iframe class="video" frameborder="0" width="300" height="180" style="width:$4px; height:$5px;" src="https://www.dailymotion.com/embed/video/$3" allowfullscreen>&lt;/iframe>'],
+  // Vimeo
+  [ /\!(\[([^\[|\]]+)?\])?\(https?:\/\/vimeo.com\/([^ |\)]*) ?(\d+)?x?(\d+)?\)/g,
+    '&lt;iframe class="video" frameborder="0" width="300" height="180" style="width:$4px; height:$5px;" src="https://player.vimeo.com/video/$3" allowfullscreen>&lt;/iframe>'],
+
+  // Audio
+  [/\!(\[([^\[|\]]+)?\])?\((https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{2,256}\.[a-z]{2,6}\b([-a-zA-Z0-9@:%_\+.~#?&amp;//=\(\)]*)\.mp3) ?(\d+)?x?(\d+)?\)/g,
+    '&lt;audio controls style="width:$6px; height:$7px;" title="$2">&lt;source src="$3" type="audio/mpeg">Your browser does not support the audio element.&lt;/audio>'],
+  // Video
+  [/\!(\[([^\[|\]]+)?\])?\((https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{2,256}\.[a-z]{2,6}\b([-a-zA-Z0-9@:%_\+.~#?&amp;//=\(\)]*)\.mp4) ?(\d+)?x?(\d+)?\)/g,
+    '&lt;video controls style="width:$6px; height:$7px;" title="$2">&lt;source src="$3" type="video/mp4">Your browser does not support the video tag.&lt;/video>'],
+
+  // Internal images
+  [/\!(\[([^\[|\]]+)?\])?\((img_|thumb_)([a-z]{3}[0-9]+\.(jpe?g|png|gif|svg)) ?(\d+)?x?(\d+)?\)/g,
+    '&lt;img style="width:$6px; height:$7px;" src="image/voir/$3$4" title="$2" />'],
+
+  // Images
+  [/!(\[([^[|\]]+)?\])?\((https?:\/\/(www\.)?[-a-zA-Z0-9@:%._+~#=]{2,256}\.[a-z]{2,6}\b([-a-zA-Z0-9@:%_+.~#?&amp;//=()]*)) ?(\d+)?x?(\d+)?\)/g,
+    '&lt;img style="width:$6px; height:$7px;" src="$3" title="$2" />'],
+  // Local images
+  [/!(\[([^[|\]]+)?\])?\((file:\/\/\/([-a-zA-Z0-9@:%_+.~#?&amp;//=()]*)) ?(\d+)?x?(\d+)?\)/g,
+    '&lt;img style="width:$5px; height:$6px;" src="$3" title="$2" />'],
+
+  // links
+  [/\[([^[]+)?\]\((https?:\/\/(www\.)?[-a-zA-Z0-9@:%._+~#=]{2,256}\.[a-z]{2,6}\b([-a-zA-Z0-9@:%_+.~#?&amp;//=]*))( ?)([^)]*)\)/g,
+    '&lt;a href=\'$2\' title="$6" target="_blank">$1&lt;/a>'],
+  [/\((https?:\/\/(www\.)?[-a-zA-Z0-9@:%._+~#=]{2,256}\.[a-z]{2,6}\b([-a-zA-Z0-9@:%_+.~#?&amp;//=]*))( ?)([^)]*)\)/g,
+    '&lt;a href=\'$1\' title="$5" target="_blank">$1&lt;/a>'],
+  // Mailto
+  [/\[([^[]+)?\]\(\bmailto\b:(\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b)\)/gi, '&lt;a href=\'mailto:$2\'>$1&lt;/a>'],
+  [/\(\bmailto\b:(\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b)\)/gi, '&lt;a href=\'mailto:$1\'>$1&lt;/a>'],
+  // tel
+  [/\[([^[]+)?\]\(tel:([0-9+-]+)\)/g, '&lt;a href=\'tel:$2\'>$1&lt;/a>'],
+  [/\(tel:([0-9+-]+)\)/g, '&lt;a href=\'tel:$1\'>$1&lt;/a>'],
+  // Fullscreen image
+  [/\[([^[]+)?\]\(app:\/\/fullscreen\)/g,
+    '&lt;a class="fullscreen" onclick="fullscreen(this)" target="_blank">$1&lt;/a>'],
+
+  // Code
+  [/`(.*?)`/g, '&lt;code>$1&lt;/code>'],					    // inline code
+  [/\n {4,}(.*)/g, '&lt;pre>$1&lt;/pre>'],					  // Code
+  [/\n\t(.*)/g, '&lt;pre>$1&lt;/pre>'],						    // Code
+  [/&lt;\/pre>&lt;pre>/g, '&lt;br/>'],							      // fix
+  [/&lt;\/pre>\n/g, '&lt;/pre>'],							        // fix
+
+  // format
+  [/(\\\*)/g, '&amp;#42;'],								          // escape *
+  [/(\*\*)([^]*?)\1/g, '&lt;strong>$2&lt;/strong>'],  // bold
+  [/(\*)([^]*?)\1/g, '&lt;em>$2&lt;/em>'],					  // emphasis
+  [/&lt;strong>&lt;\/strong>/g, '****'],				      // fix bold
+  [/&lt;em>&lt;\/em>/g, '**'],							          // fix em
+  [/(__)(.*?)\1/g, '&lt;u>$2&lt;/u>'],						    // underline
+  [/(~~)(.*?)\1/g, '&lt;del>$2&lt;/del>'],				    // del
+
+  // alignement https://github.com/jgm/pandoc/issues/719
+  [/\n\|&amp;lt;&amp;gt;([^\n]*)/g, "\n&lt;pc>$1&lt;/pc>"],			// center |&lt;>
+  [/\n\|\t([^\n]*)/g, "\n&lt;pc>$1&lt;/pc>"],				// center |[tab]
+  [/\n\|&amp;lt;([^\n]*)/g, "\n&lt;pl>$1&lt;/pl>"],				// left |&lt;
+  [/\n\|&amp;gt;([^\n]*)/g, "\n&lt;pr>$1&lt;/pr>"],				// rigth |>
+  [/&lt;\/pc>\n&lt;pc>/g, "&lt;br/>"],
+  [/&lt;\/pl>\n&lt;pl>/g, "&lt;br/>"],
+  [/&lt;\/pr>\n&lt;pr>/g, "&lt;br/>"],
+  [/&lt;pc>/g, "&lt;div class='center'>"],					//	fix
+  [/&lt;pl>/g, "&lt;div class='left'>"],					//	fix
+  [/&lt;pr>/g, "&lt;div class='right'>"],					//	fix
+  [/&lt;\/pc>|&lt;\/pl>|&lt;\/pr>/g, "&lt;/div>"],					//	fix
+
+  // French typo
+  [/ ([\?|\!|;|:])/g, '&amp;nbsp;$1'],
+
+  //
+  [/\(c\)/g, "&amp;copy;"],									// (c)
+  [/\(r\)/g, "&amp;reg;"],									// (R)
+  [/\(TM\)/g, "&amp;trade;"]									// (TM)
+
+];
+
+/**	jQuery plugin to display markdown content of a textarea into resulting div.
+ * @function external:"jQuery.fn".md
+ * @param {} dest output element to display the result
+ * @param {} data a list of key/value to replace in the markdown (using %key%)
+ * @example
+// Put content of the markdown textarea in the result div.
+$(".markdown").md(".result", { name: "hello world!" })
+* /
+(function($) {
+  var hit=0;
+  // Delay refresh when typping
+  function refresh(from, to, data, delay) {
+    if (!delay) {
+      hit++;
+      setTimeout (function(){refresh(from, to, data, true)}, 500);
+    }
+    else {
+      hit--;
+      if (!hit) {
+        $(to).html ( md2html($(from).val(), data) );
+      }
+    }
+  }
+
+  // Insert char at caret pos in a textarea
+  $.fn.insertChar = function(t0, t1) {
+    if (this.prop('tagName')=="TEXTAREA") {
+    var selStart = this.prop('selectionStart')
+      var selEnd = this.prop('selectionEnd')
+      var val = this.val();
+      this.val(val.substring(0, selStart) + (t0||"") + val.substring(selStart, selEnd) + (t1||"") + val.substring(selEnd) );
+      var pos = selEnd + (t0||"").length + (t1||"").length;
+      this.prop('selectionStart', pos);
+      this.prop('selectionEnd', pos);
+    }
+    return this;
+  }
+
+  //
+  $.fn.md = function(dest, data) {
+    data = data || {};
+    refresh (this, dest, data);
+    return this
+      // Prevent tab default behavior
+      .keydown (function(e) {
+        // Prevent tab default behavior
+        if (e.keyCode==9) {
+          $(this).insertChar('\t');
+          e.preventDefault();
+        }
+      })
+      // Refresh
+      .keyup (function(e) {
+        if (e.keyCode==13 || e.keyCode==8 || e.keyCode==32 || (e.keyCode>40 &amp;&amp; e.keyCode&lt;200)) refresh (this, dest, data);
+        //console.log(e.keyCode)
+      })
+      .change (function() {
+        refresh (this, dest, data);
+      });
+  };
+}(jQuery));
+*/
+
+/** Display md in an element
+ * @param {string} md
+ * @param {Element} [element] create one if none
+ * @returns {Element}
+ */
+md2html.element = function(md, element) {
+  if (!(element instanceof Element)) element = ol_ext_element.create('DIV', { className: 'md' });
+  element.innerHTML = md2html(md);
+  md2html.twitterWidget(element);
+  return element;
+}
+
+/** Load twitter widget inside the element
+ * @param {Element} element
+ */
+md2html.twitterWidget = function(element) {
+  if (window.twttr) {
+    window.twttr.widgets.load(element);
+  } else {
+    console.error('Twitter is not loaded...')
+  }
+}
+
+export default md2html
+</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="module-dialog_url.html">dialog/url</a></li><li><a href="module-font_loadFonts.html">font/loadFonts</a></li><li><a href="module-layout.html">layout</a></li><li><a href="module-layout_JCSSRule.html">layout/JCSSRule</a></li><li><a href="module-md_md2html.html">md/md2html</a></li><li><a href="module-style_ignStyleFn.html">style/ignStyleFn</a></li><li><a href="module-version_toV4.html">version/toV4</a></li></ul><h3>Namespaces</h3><ul><li><a href="JSONFile.html">JSONFile</a></li><li><a href="JSONOptions.html">JSONOptions</a></li></ul><h3>Classes</h3><ul><li><a href="BaseFormat.html">BaseFormat</a></li><li><a href="Carte.html">Carte</a></li><li><a href="CarteFormat.html">CarteFormat</a></li><li><a href="CGU.html">CGU</a></li><li><a href="cloneFeature.html">cloneFeature</a></li><li><a href="GeoImage.html">GeoImage</a></li><li><a href="GeoportailFormat.html">GeoportailFormat</a></li><li><a href="I18N.html">I18N</a></li><li><a href="LayerFormat.html">LayerFormat</a></li><li><a href="Legend.html">Legend</a></li><li><a href="MousePosition.html">MousePosition</a></li><li><a href="Statistic.html">Statistic</a></li><li><a href="StoryMap.html">StoryMap</a></li><li><a href="StoryMapFormat.html">StoryMapFormat</a></li><li><a href="VectorStyle.html">VectorStyle</a></li><li><a href="VectorStyleFormat.html">VectorStyleFormat</a></li><li><a href="WMS.html">WMS</a></li></ul><h3>Events</h3><ul><li><a href="global.html#event:read">read</a></li></ul><h3>Global</h3><ul><li><a href="global.html#_T">_T</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 3.6.7</a> on Tue Oct 26 2021 17:05:45 GMT+0200 (heure d’été d’Europe centrale)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>

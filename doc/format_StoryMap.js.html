@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: format/StoryMap.js</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: format/StoryMap.js</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>import { unByKey } from 'ol/observable';
+import { fromLonLat } from 'ol/proj';
+import Carte from '../Carte';
+import BaseFormat from './Base';
+import { storyV4 } from './version/toV4';
+import Synchronize from 'ol-ext/interaction/Synchronize'
+
+/**
+ * @classdesc
+ * Base class for reading / writing .story
+ * @api
+ */
+class StoryMapFormat extends BaseFormat {
+  /** Constructor 
+   */
+  constructor() {
+    super();
+  }
+}
+
+/** Read method
+ * @param {StoryMap} story
+ * @param {Object} options json object
+ * @return {StoryMap}
+ */
+StoryMapFormat.prototype.read = function(story, options) {
+  storyV4(options);
+
+  story.setModel(options.type);
+  story.setTitle(options.param);
+  story.showTitle(options.param.showTitle);
+  story.set('description', options.param.description);
+  story.setLogo(options.param.logo);
+  story.setLayout(options.layout);
+
+  if (options.type === 'onglet') {
+    story.clearTabs();
+    options.tabs.forEach(o => {
+      story.addTab(o);
+    });
+    story.dispatchEvent({
+      type: 'read'
+    });
+  } else if (!options.cartes.carte) {
+    // Load carte
+    const nb = options.cartes.length;
+    let loaded = 0;
+    options.cartes.forEach((c) => {
+      c.carte = new Carte({
+        key: story.get('key'),
+        id: c.id
+      });
+      const readListener = c.carte.once('read', () => {
+        unByKey(errorListener);
+        loaded++;
+        // All cartes are loaded
+        if (loaded === nb) {
+          this.read2(story, options);
+        }
+      });
+      const errorListener = c.carte.once('error', (e) => {
+        unByKey(readListener);
+        story.dispatchEvent(e);
+      });
+    });
+    return;
+  }
+}
+
+/** Read StoryMap when maps are ready
+ * @private
+ */
+StoryMapFormat.prototype.read2 = function(story, options) {
+  // Read StoryMap
+  story.setCarte(options.cartes[0].carte);
+  if (options.cartes.length > 1) {
+    story.setCarte(options.cartes[1].carte, 1);
+  }
+  /*
+  story.setModel(options.type);
+  story.setTitle(options.param);
+  story.showTitle(options.param.showTitle);
+  story.set('description', options.param.description);
+  story.setLogo(options.param.logo);
+  story.setLayout(options.layout);
+  */
+  story.setControls(options.controls);
+
+  story.setPopup(options.popup.popup);
+  story.setTips(options.popup.tips);
+
+  const carte = story.cartes[0];
+
+  // Map position
+  carte.map.getView().setCenter(fromLonLat([options.param.lon, options.param.lat]));
+  carte.map.getView().setZoom(options.param.zoom);
+  carte.map.getView().setRotation(options.param.rot);
+
+  // Synchronize maps
+  if (options.type === 'compare') {
+    story.setTitle({ title1: options.cartes[0] ? options.cartes[0].title : '' })
+    story.setTitle({ title2: options.cartes[1] ? options.cartes[1].title : '' })
+  }
+
+  // Map position
+  carte.map.getView().setCenter(fromLonLat([options.param.lon, options.param.lat]));
+  carte.map.getView().setZoom(options.param.zoom);
+  carte.map.getView().setRotation(options.param.rot);
+
+  // Etape
+  const steps = story.getSteps();
+  steps.clear();
+  if (options.type === 'etape') {
+    options.steps.forEach(s => steps.push(s));
+  }
+
+  story.dispatchEvent({
+    type: 'read'
+  });
+
+  return story;
+}
+
+export default StoryMapFormat
+</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="module-dialog_url.html">dialog/url</a></li><li><a href="module-font_loadFonts.html">font/loadFonts</a></li><li><a href="module-layout.html">layout</a></li><li><a href="module-layout_JCSSRule.html">layout/JCSSRule</a></li><li><a href="module-md_md2html.html">md/md2html</a></li><li><a href="module-style_ignStyleFn.html">style/ignStyleFn</a></li><li><a href="module-version_toV4.html">version/toV4</a></li></ul><h3>Namespaces</h3><ul><li><a href="JSONFile.html">JSONFile</a></li><li><a href="JSONOptions.html">JSONOptions</a></li></ul><h3>Classes</h3><ul><li><a href="BaseFormat.html">BaseFormat</a></li><li><a href="Carte.html">Carte</a></li><li><a href="CarteFormat.html">CarteFormat</a></li><li><a href="CGU.html">CGU</a></li><li><a href="cloneFeature.html">cloneFeature</a></li><li><a href="GeoImage.html">GeoImage</a></li><li><a href="GeoportailFormat.html">GeoportailFormat</a></li><li><a href="I18N.html">I18N</a></li><li><a href="LayerFormat.html">LayerFormat</a></li><li><a href="Legend.html">Legend</a></li><li><a href="MousePosition.html">MousePosition</a></li><li><a href="Statistic.html">Statistic</a></li><li><a href="StoryMap.html">StoryMap</a></li><li><a href="StoryMapFormat.html">StoryMapFormat</a></li><li><a href="VectorStyle.html">VectorStyle</a></li><li><a href="VectorStyleFormat.html">VectorStyleFormat</a></li><li><a href="WMS.html">WMS</a></li></ul><h3>Events</h3><ul><li><a href="global.html#event:read">read</a></li></ul><h3>Global</h3><ul><li><a href="global.html#_T">_T</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 3.6.7</a> on Tue Oct 26 2021 17:05:45 GMT+0200 (heure d’été d’Europe centrale)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>

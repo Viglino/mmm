@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: format/Carte.js</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: format/Carte.js</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>import BaseFormat from './Base';
+import { fromLonLat } from 'ol/proj';
+import GeoportailFormat from './layer/Geoportail'
+import VectorStyleFormat from './layer/VectorStyle';
+import GeoImageFormat from './layer/Geoimage';
+import StatisticFormat from './layer/Statistic';
+import WMS from './layer/WMS';
+import MousePositionFormat from './control/MousePosition';
+import LegendFormat from './control/Legend';
+
+import {carteV4} from './version/toV4'
+
+/**
+ * @classdesc Base class for reading / writing .macarte
+ * @api
+ */
+class CarteFormat extends BaseFormat {
+  /** Constructor 
+   */
+  constructor() {
+    super();
+  }
+}
+
+/** layer formats */
+CarteFormat.layerFormats = [
+  GeoportailFormat,
+  GeoImageFormat,
+  StatisticFormat,
+  VectorStyleFormat,
+  WMS
+];
+
+/** Read method
+ * @param {Carte} carte
+ * @param {Object} options json object
+ * @return {Carte}
+ */
+CarteFormat.prototype.read = function(carte, options) {
+  carteV4(options);
+  const map = carte.map;
+  // map
+  map.set('title', options.param.title || options.param.titre || '');
+  map.set('description', options.param.description || '');
+  // Read view
+  this.readView(carte, options);
+  // Read layers
+  map.getLayers().clear();
+  this.readLayers(options, carte.get('key')).forEach( l => map.addLayer(l) );
+  // Read controls
+  this.readControls(carte, options);
+  return carte;
+};
+
+/** Read view param
+ * @param {View} view
+ * @param {Object} options json object
+ */
+CarteFormat.prototype.readView = function(carte, options) {
+  const view = carte.map.getView();
+  view.setCenter(fromLonLat([options.param.lon, options.param.lat], view.getProjection()));
+  view.setZoom(options.param.zoom);
+  view.setRotation(options.param.rot);
+  // Read permalink
+  const replace = carte.getControl('permalink').getUrlReplace();
+  const plink = carte.getControl('permalink');
+  plink.setPosition(true);
+  carte.map.set('noMouseWheel', plink.hasUrlParam('noZoom'));
+  // Disable permalink
+  if (!replace) carte.getControl('permalink').setUrlReplace(false);
+};
+
+/** Read controls for the current carte
+ * @param {Carte} carte
+ * @param {Object} options json object
+ */
+CarteFormat.prototype.readControls = function(carte, options) {
+  // Controls
+  const cparam = options.controls;
+  for (let i in cparam) {
+    carte.showControl(i, cparam[i]);
+  }
+  // Coordinates
+  new MousePositionFormat(carte.getControl('mousePosition'), cparam.mousePosition);
+  // Legende
+  new LegendFormat(carte.getControl('legend'), cparam.legend);
+};
+
+/** Read layers
+ * @param {Object} options json object
+ * @param {string} key GPP API key
+ * @return {Array&lt;Layer>}
+ */
+CarteFormat.prototype.readLayers = function(options, key) {
+  const layers = [];
+  options.layers.forEach((l) => {
+    let i;
+    for (i=0; i&lt;CarteFormat.layerFormats.length; i++) {
+      const format = new CarteFormat.layerFormats[i];
+      const layer = format.read(l, key);
+      if (layer) {
+        layers.push(layer);
+        break;
+      }
+    }
+  });
+  return layers;
+};
+
+/** Write method
+ * @param {Carte} carte
+ * @return {Object|boolean}
+ */
+CarteFormat.prototype.write = function(/* carte */) {
+  console.warn('[Abstract] read method not implemented...')
+  return null
+};
+
+export default CarteFormat
+</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="module-dialog_url.html">dialog/url</a></li><li><a href="module-font_loadFonts.html">font/loadFonts</a></li><li><a href="module-layout.html">layout</a></li><li><a href="module-layout_JCSSRule.html">layout/JCSSRule</a></li><li><a href="module-md_md2html.html">md/md2html</a></li><li><a href="module-style_ignStyleFn.html">style/ignStyleFn</a></li><li><a href="module-version_toV4.html">version/toV4</a></li></ul><h3>Namespaces</h3><ul><li><a href="JSONFile.html">JSONFile</a></li><li><a href="JSONOptions.html">JSONOptions</a></li></ul><h3>Classes</h3><ul><li><a href="BaseFormat.html">BaseFormat</a></li><li><a href="Carte.html">Carte</a></li><li><a href="CarteFormat.html">CarteFormat</a></li><li><a href="CGU.html">CGU</a></li><li><a href="cloneFeature.html">cloneFeature</a></li><li><a href="GeoImage.html">GeoImage</a></li><li><a href="GeoportailFormat.html">GeoportailFormat</a></li><li><a href="I18N.html">I18N</a></li><li><a href="LayerFormat.html">LayerFormat</a></li><li><a href="Legend.html">Legend</a></li><li><a href="MousePosition.html">MousePosition</a></li><li><a href="Statistic.html">Statistic</a></li><li><a href="StoryMap.html">StoryMap</a></li><li><a href="StoryMapFormat.html">StoryMapFormat</a></li><li><a href="VectorStyle.html">VectorStyle</a></li><li><a href="VectorStyleFormat.html">VectorStyleFormat</a></li><li><a href="WMS.html">WMS</a></li></ul><h3>Events</h3><ul><li><a href="global.html#event:read">read</a></li></ul><h3>Global</h3><ul><li><a href="global.html#_T">_T</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 3.6.7</a> on Tue Oct 26 2021 17:05:45 GMT+0200 (heure d’été d’Europe centrale)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>

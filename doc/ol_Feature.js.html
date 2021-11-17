@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: ol/Feature.js</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: ol/Feature.js</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>/* @File extent openlayers features with  */
+import Feature from 'ol/Feature'
+
+import {getLength as ol_sphere_getLength} from 'ol/sphere'
+import {getArea as ol_sphere_getArea} from 'ol/sphere'
+import {toStringHDMS as ol_coordinate_toStringHDMS} from 'ol/coordinate'
+import {getCenter as ol_extent_getCenter} from 'ol/extent'
+import {transform as ol_proj_transform} from 'ol/proj'
+
+import ol_ext_element from 'ol-ext/util/element'
+
+import md2html from '../md/md2html'
+import { defaultIgnStyle } from '../style/ignStyleFn'
+
+/** @class Feature 
+ * Extend Opelayers Features
+ */
+
+var cloneFeature = Feature.prototype.clone;
+/** Overwrite feature clone
+ */
+Feature.prototype.clone = function() {
+  const f = cloneFeature.call(this);
+  f.setIgnStyle(this.getIgnStyle());
+  return f;
+}
+
+/** Get layer for a feature
+ *	@return { ol_layer_Layer | undefined } the layer
+ */
+Feature.prototype.getLayer= function() {
+  return this._layer;
+};
+
+/** Get layer for a feature
+ *	@param { ol_layer_Layer } layer
+ */
+Feature.prototype.setLayer= function(layer) {
+  this._layer = layer;
+};
+
+/** Get IGN style for a feature
+ * @param { string | true | undefined } property
+ *  1/ the property to get
+ *  2/ true to get all properties
+ *  3/ undefined to get the properties on the feature
+ * @return {string|number|Array} the style
+ */
+Feature.prototype.getIgnStyle = function(property) {
+  if (!this._ignStyle  || Array.isArray(this._ignStyle)) {
+    this._ignStyle = {};
+  }
+  // Test property
+  if (!property) {
+    return this._ignStyle;
+  } else if (property===true) {
+    var style = {};
+    // Get all properties
+    for (var i in defaultIgnStyle) {
+      style[i] = this.getIgnStyle(i);
+    }
+    return style;
+  } else {
+    var val;
+    // Feature property
+    if (Object.prototype.hasOwnProperty.call(this._ignStyle, property)) {
+      val = this._ignStyle[property];
+    } else {
+      // or default layer property
+      if (this.getLayer() 
+        &amp;&amp; this.getLayer()._ignStyle 
+        &amp;&amp; Object.prototype.hasOwnProperty.call(this.getLayer()._ignStyle, property)
+        ) {
+        val = this.getLayer()._ignStyle[property];
+      } else {
+        // or default property
+        val = defaultIgnStyle[property];
+      }
+    }
+    return val;
+  }
+};
+
+/** Set IGN style for a feature
+ * @param {string|ignStyle} property the property to set
+ * @param {string|number} val the value to set
+ */
+Feature.prototype.setIgnStyle = function(property, val) {
+  if (!this._ignStyle  || Array.isArray(this._ignStyle)) {
+    this._ignStyle = {};
+  }
+  if (val === undefined) {
+    if (property &amp;&amp; typeof(property) !== 'string') {
+        this._ignStyle = property;
+    }
+    return;
+  } else if (val !== '' &amp;&amp; /width|radius|size|offset/i.test(property)) {
+    val = Number(val);
+  }
+  if (this.getLayer()
+    &amp;&amp; this.getLayer()._ignStyle
+    &amp;&amp; Object.prototype.hasOwnProperty.call(this.getLayer()._ignStyle, property)
+    &amp;&amp; val != this.getLayer()._ignStyle[property]
+    ) {
+    this._ignStyle[property] = val;
+  } else if (val !== '' &amp;&amp; val != defaultIgnStyle[property]) {
+    this._ignStyle[property] = val;
+  } else {
+    delete this._ignStyle[property];
+  }
+};
+
+/** Check if a feature has a popupcontent
+ */
+Feature.prototype.hasPopupContent = function() {
+  if ((this._popupContent &amp;&amp; this._popupContent.active!==false)
+  || (this.getLayer() &amp;&amp; this.getLayer().getPopupContent &amp;&amp; this.getLayer().getPopupContent())) return true;
+    return false;
+};
+
+/**
+ * Format length output.
+ * @param {ol.geom.LineString} line The line.
+ * @return {string} The formatted length.
+ * @private
+ */
+var formatLength = function(line) {
+  var length = ol_sphere_getLength(line);
+  var output = (length > 100) ? (Math.round(length / 1000 * 100) / 100) + ' ' + 'km'
+      : (Math.round(length * 100) / 100) + ' ' + 'm';
+  return output;
+};
+
+/**
+ * Format area output.
+ * @param {ol.geom.Polygon} polygon The polygon.
+ * @return {string} Formatted area.
+ * @private
+ */
+var formatArea = function(polygon) {
+  var area = Math.abs(ol_sphere_getArea(polygon));
+  var output = (area > 10000) ? (Math.round(area / 1000000 * 100) / 100) + ' ' + 'km&lt;sup>2&lt;/sup>'
+    : (Math.round(area * 100) / 100) + ' ' + 'm&lt;sup>2&lt;/sup>';
+  return output;
+};
+
+/** Get popupcontent for a feature
+ * @param {Object|true|undefined} options popupoptions (with a content propertie) or undefined to get the popupcontent object
+ *  @param {string} options.titre
+ *  @param {string} options.desc
+ *	@param {string} options.img
+ *  @param {string} optionscoord
+ * @return {string|Element} popupcontent
+ */
+Feature.prototype.getPopupContent = function(content, html) {
+  if (!content) return (this._popupContent || {});
+
+  if (this._popupContent &amp;&amp; this._popupContent.active) content = this._popupContent;
+  else if (content===true) content = (this.getLayer() &amp;&amp; this.getLayer().getPopupContent ? this.getLayer().getPopupContent() : '');
+  if (!content) return '';
+
+  var format = (content.titre ? '####' + content.titre + '\n' : '')
+    + (content.desc ? content.desc + '\n': '')
+    + (content.img ? '!(' + content.img + ')' + '\n' : '')
+    + (content.coord ? '**%COORD%**' : '');
+  format = format.replace(/\n$/, '');
+  // if (!format) return '';
+
+  var list = this.getProperties();
+  var pt; 
+  var geom = this.getGeometry();
+  switch (geom.getType()) {
+    case 'LineString':
+      pt = geom.getClosestPoint(ol_extent_getCenter(geom.getExtent()));
+      if (!list.LENGTH) list.LENGTH = formatLength(geom);
+      break;
+    case 'Polygon':
+      pt = geom.getInteriorPoint().getCoordinates();
+      if (!list.AREA) list.AREA = formatArea(geom);
+      break;
+    default:
+      pt = geom.getFirstCoordinate();
+  }
+  var coord = ol_proj_transform(pt, 'EPSG:3857', 'EPSG:4326');
+  var lon = coord[0].toFixed(6);
+  var lat = coord[1].toFixed(6);
+  list.COORD = (lat &lt; 0 ? -lat : lat) + '&amp;deg;' + (lat &lt; 0 ? 'S' : 'N')
+    + ' ' + (lon &lt; 0 ? -lon : lon) + '&amp;deg;' + (lon &lt; 0 ? 'O' : 'E');
+  list.COORDMS = ol_coordinate_toStringHDMS(coord).replace(/ /g, '').replace('N', 'N ').replace('S', 'S ');
+  if (!list.LON) list.LON = lon;
+  if (!list.LAT) list.LAT = lat;
+
+  var md = md2html(format, list);
+  if (html) return md;
+
+  const div = ol_ext_element.create('DIV', {
+    html: md,
+    className: 'md'
+  });
+  md2html.twitterWidget(div);
+  return div;
+};
+
+/** Get info content (1 line abstract)
+ */
+Feature.prototype.getInfoContent = function() {
+  const html = this.getPopupContent(true, true).replace(/&lt;br ?\/>|&lt;\/h.?>/g,' ');
+  const d = ol_ext_element.create('DIV', { html: html }).innerText.substr(0, 50);
+  return d;
+};
+
+/** Set popupcontent for a feature
+*	@param {} options
+*		- active {boolean}
+*		- titre {string}
+*		- desc {string}
+*		- img {string}
+*/
+Feature.prototype.setPopupContent = function(content) {
+  if (!content || content instanceof Array) this._popupContent = {};
+  else this._popupContent = content;
+};
+
+/** Get labelcontent for a feature
+*	@param {Object|true|undefined} options popupoptions (with a content propertie) or undefined to get the popupcontent object
+*
+*	@return {html} labelcontent
+*/
+Feature.prototype.getLabelContent = function(content) {
+  if (!content) return '';
+
+  var format = content;
+  format = format.replace(/\n$/, '');
+  var list = this.getProperties();
+  var md = md2html.doData (format, list);
+  md = md.replace(/&lt;br \/>/, '');
+  md = md.replace(/&lt;br\/>/, '');
+  return md;
+};
+
+/** Show a popup at the right place
+*	If the feature has no content the popup is hidden.
+*	The popup is placed on the object (closest point)
+*	and use the feature style to calculate the offset from the point symbol.
+* @param {ol.Overlay.Popup} popup the popup to display on the map
+* @param {ol.Coordinate} coord popup position (the closest point will be used)
+* @param {ol.geom|undefined} geom use as geometry
+* @return {string} the popup content
+*/
+Feature.prototype.showPopup = function(popup, coord, geom) {
+  var f = this;
+  var content = this.getPopupContent(true);
+  if (content.innerText.trim()) {
+    popup.setOffset([0, 0]);
+    switch (this.getGeometry().getType()) {
+      case 'Point':{
+        var offset = popup.offsetBox;
+        var style = f.getLayer().getIgnStyle(f);
+        var offsetX = /left|right/.test(popup.autoPositioning[0]) ? style.pointRadius : 0;
+        popup.offsetBox = [-offsetX, (style.pointOffsetY ? -2:-1)*style.pointRadius, offsetX, style.pointOffsetY ? 0:style.pointRadius];
+        if (geom) popup.show(geom.getClosestPoint(coord), content);
+        else popup.show(this.getGeometry().getClosestPoint(coord), content);
+        popup.offsetBox = offset;
+        break;
+      }
+      default:{
+        if (/polygon/i.test(this.getGeometry().getType())) popup.show(coord, content);
+        else popup.show(this.getGeometry().getClosestPoint(coord), content);
+      }
+    }
+  } else popup.hide();
+  // Load Twitter widget
+  md2html.twitterWidget(popup.getElement());
+  return content;
+};
+
+export default Feature</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="module-dialog_url.html">dialog/url</a></li><li><a href="module-font_loadFonts.html">font/loadFonts</a></li><li><a href="module-layout.html">layout</a></li><li><a href="module-layout_JCSSRule.html">layout/JCSSRule</a></li><li><a href="module-md_md2html.html">md/md2html</a></li><li><a href="module-style_ignStyleFn.html">style/ignStyleFn</a></li><li><a href="module-version_toV4.html">version/toV4</a></li></ul><h3>Namespaces</h3><ul><li><a href="JSONFile.html">JSONFile</a></li><li><a href="JSONOptions.html">JSONOptions</a></li></ul><h3>Classes</h3><ul><li><a href="BaseFormat.html">BaseFormat</a></li><li><a href="Carte.html">Carte</a></li><li><a href="CarteFormat.html">CarteFormat</a></li><li><a href="CGU.html">CGU</a></li><li><a href="cloneFeature.html">cloneFeature</a></li><li><a href="GeoImage.html">GeoImage</a></li><li><a href="GeoportailFormat.html">GeoportailFormat</a></li><li><a href="I18N.html">I18N</a></li><li><a href="LayerFormat.html">LayerFormat</a></li><li><a href="Legend.html">Legend</a></li><li><a href="MousePosition.html">MousePosition</a></li><li><a href="Statistic.html">Statistic</a></li><li><a href="StoryMap.html">StoryMap</a></li><li><a href="StoryMapFormat.html">StoryMapFormat</a></li><li><a href="VectorStyle.html">VectorStyle</a></li><li><a href="VectorStyleFormat.html">VectorStyleFormat</a></li><li><a href="WMS.html">WMS</a></li></ul><h3>Events</h3><ul><li><a href="global.html#event:read">read</a></li></ul><h3>Global</h3><ul><li><a href="global.html#_T">_T</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 3.6.7</a> on Tue Oct 26 2021 17:05:45 GMT+0200 (heure d’été d’Europe centrale)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>
