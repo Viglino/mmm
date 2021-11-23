@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   xmlns:dc="http://purl.org/dc/elements/1.1/"
+   xmlns:cc="http://creativecommons.org/ns#"
+   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+   xmlns:svg="http://www.w3.org/2000/svg"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   id="icon-star-full"
+   width="30"
+   height="30"
+   viewBox="0 0 30 30"
+   version="1.1"
+   sodipodi:docname="star-full.svg"
+   inkscape:version="0.92.4 (5da689c313, 2019-01-14)">
+  <metadata
+     id="metadata9">
+    <rdf:RDF>
+      <cc:Work
+         rdf:about="">
+        <dc:format>image/svg+xml</dc:format>
+        <dc:type
+           rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
+      </cc:Work>
+    </rdf:RDF>
+  </metadata>
+  <defs
+     id="defs7" />
+  <sodipodi:namedview
+     pagecolor="#ffffff"
+     bordercolor="#666666"
+     borderopacity="1"
+     objecttolerance="10"
+     gridtolerance="10"
+     guidetolerance="10"
+     inkscape:pageopacity="0"
+     inkscape:pageshadow="2"
+     inkscape:window-width="1280"
+     inkscape:window-height="971"
+     id="namedview5"
+     showgrid="false"
+     inkscape:zoom="7.8666667"
+     inkscape:cx="15"
+     inkscape:cy="15"
+     inkscape:window-x="-8"
+     inkscape:window-y="-8"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="icon-star-full" />
+  <path
+     style="fill:#091625;stroke-width:1.49992931"
+     inkscape:connector-curvature="0"
+     d="M 9.8807414,9.3227652 13.777557,1.4286374 a 1.3634357,1.3634357 0 0 1 2.444885,0 l 3.899816,7.8941278 8.714589,1.2734398 a 1.3634357,1.3634357 0 0 1 0.749965,2.32639 l -6.299703,6.14071 1.48793,8.674091 a 1.3634357,1.3634357 0 0 1 -1.978407,1.436933 L 14.9985,25.076522 7.1988674,29.174329 a 1.3634357,1.3634357 0 0 1 -1.978406,-1.436933 l 1.487929,-8.674091 -6.29520272,-6.14071 a 1.3634357,1.3634357 0 0 1 0.74996462,-2.32639 z"
+     data-name="Shape"
+     id="Shape-2" />
+</svg>

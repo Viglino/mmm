@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   xmlns:dc="http://purl.org/dc/elements/1.1/"
+   xmlns:cc="http://creativecommons.org/ns#"
+   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+   xmlns:svg="http://www.w3.org/2000/svg"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   version="1.1"
+   viewBox="0 0 30 30"
+   height="30"
+   width="30"
+   id="icon-share2"
+   sodipodi:docname="uE911-clock.svg"
+   inkscape:version="0.92.4 (5da689c313, 2019-01-14)">
+  <sodipodi:namedview
+     pagecolor="#ffffff"
+     bordercolor="#666666"
+     borderopacity="1"
+     objecttolerance="10"
+     gridtolerance="10"
+     guidetolerance="10"
+     inkscape:pageopacity="0"
+     inkscape:pageshadow="2"
+     inkscape:window-width="1280"
+     inkscape:window-height="971"
+     id="namedview6"
+     showgrid="false"
+     inkscape:zoom="7.8666667"
+     inkscape:cx="10.263611"
+     inkscape:cy="-6.1716192"
+     inkscape:window-x="-8"
+     inkscape:window-y="-8"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="icon-share2" />
+  <metadata
+     id="metadata12">
+    <rdf:RDF>
+      <cc:Work
+         rdf:about="">
+        <dc:format>image/svg+xml</dc:format>
+        <dc:type
+           rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
+        <dc:title />
+      </cc:Work>
+    </rdf:RDF>
+  </metadata>
+  <defs
+     id="defs4" />
+  <path
+     d="m 14.895,5.303965 c -0.566338,0 -1.025479,0.45914 -1.025479,1.02548 v 9.22758 c 0,0.37936 0.206719,0.70936 0.512579,0.88684 l 7.401591,4.27172 c 0.490635,0.28356 1.116211,0.11707 1.399014,-0.37356 0.283565,-0.49023 0.11707,-1.11622 -0.373564,-1.39902 l -6.889014,-3.97315 v -8.64035 c 0,-0.56634 -0.458789,-1.02548 -1.025127,-1.02548 z M 15,27.804695 c -7.085127,0 -12.804873,-5.71936 -12.804873,-12.80452 0,-7.08516 5.7197753,-12.80487 12.804873,-12.80487 7.084775,0 12.804873,5.71977 12.804873,12.80487 0,7.0851 -5.720127,12.80452 -12.804873,12.80452 z M 15,1.75e-4 v 0 c -8.2712109,0 -15,6.72879 -15,15 0,8.27121 6.7287891,14.99965 15,14.99965 8.271211,0 15,-6.72841 15,-14.99965 0,-8.27124 -6.728789,-15 -15,-15 z"
+     style="fill:#091625;stroke-width:0"
+     id="path5"
+     inkscape:connector-curvature="0" />
+</svg>

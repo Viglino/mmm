@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   xmlns:dc="http://purl.org/dc/elements/1.1/"
+   xmlns:cc="http://creativecommons.org/ns#"
+   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+   xmlns:svg="http://www.w3.org/2000/svg"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   id="icon-share"
+   width="30"
+   height="30"
+   viewBox="0 0 30 30"
+   version="1.1"
+   sodipodi:docname="share-alt.svg"
+   inkscape:version="0.92.4 (5da689c313, 2019-01-14)">
+  <metadata
+     id="metadata9">
+    <rdf:RDF>
+      <cc:Work
+         rdf:about="">
+        <dc:format>image/svg+xml</dc:format>
+        <dc:type
+           rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
+      </cc:Work>
+    </rdf:RDF>
+  </metadata>
+  <defs
+     id="defs7" />
+  <sodipodi:namedview
+     pagecolor="#ffffff"
+     bordercolor="#666666"
+     borderopacity="1"
+     objecttolerance="10"
+     gridtolerance="10"
+     guidetolerance="10"
+     inkscape:pageopacity="0"
+     inkscape:pageshadow="2"
+     inkscape:window-width="1280"
+     inkscape:window-height="971"
+     id="namedview5"
+     showgrid="false"
+     inkscape:zoom="7.8666667"
+     inkscape:cx="15"
+     inkscape:cy="15"
+     inkscape:window-x="-8"
+     inkscape:window-y="-8"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="icon-share" />
+  <path
+     style="fill:#091625;stroke-width:1.3621136"
+     inkscape:connector-curvature="0"
+     d="m 17.715043,24.542237 a 5.4361952,5.4361952 0 0 1 0.205679,-1.486066 l -7.234185,-4.222552 a 5.4484542,5.4484542 0 1 1 0,-7.664613 L 17.91936,6.9464544 a 5.4607132,5.4607132 0 1 1 1.375735,2.3578185 l -7.232823,4.2225521 a 5.4634374,5.4634374 0 0 1 0,2.961235 l 7.236909,4.222552 a 5.4484542,5.4484542 0 1 1 -1.584138,3.831625 z m 2.724227,0 a 2.7242271,2.7242271 0 1 0 0.45767,-1.510584 1.3621135,1.3621135 0 0 1 -0.162091,0.272423 2.7065196,2.7065196 0 0 0 -0.295579,1.238161 z M 4.0939074,15.007442 a 2.7242271,2.7242271 0 0 0 5.0479927,1.419323 l 0.02724,-0.0504 0.03133,-0.0504 a 2.7242271,2.7242271 0 0 0 0,-2.638414 l -0.03133,-0.0504 -0.0286,-0.0504 A 2.7242271,2.7242271 0 0 0 4.0939074,15.007442 Z M 23.163497,8.1968746 A 2.7242271,2.7242271 0 1 0 20.775712,6.7843629 l 0.03678,0.058571 0.03269,0.061295 a 2.7242271,2.7242271 0 0 0 2.318317,1.2926457 z"
+     data-name="Combined Shape"
+     id="Combined_Shape-2" />
+</svg>
